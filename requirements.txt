@@ -1,7 +1,6 @@
 fastapi
 uvicorn
 pandas
-pandas-ta
 numpy
 aiohttp
 requests
