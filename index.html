@@ -14,7 +14,11 @@
             padding: 20px;
         }
         h1 { color: #00e676; margin-bottom: 5px; }
-        p { color: #aaaaaa; font-size: 14px; margin-bottom: 20px; }
+        p { color: #aaaaaa; font-size: 14px; margin-bottom: 10px; }
+        
+        /* Naya Status Text Style */
+        #status-text { font-weight: bold; font-size: 16px; margin-bottom: 20px; padding: 10px; background-color: #1e1e1e; border-radius: 5px; display: inline-block;}
+        
         table { 
             width: 95%; 
             max-width: 800px; 
@@ -35,16 +39,24 @@
             letter-spacing: 1px;
         }
         tr:hover { background-color: #2a2a2a; }
+        
+        /* Rango ki styling */
         .buy { color: #00e676; font-weight: bold; font-size: 16px; }
         .sell { color: #ff3d00; font-weight: bold; font-size: 16px; }
         .wait { color: #777777; }
         .coin-name { font-weight: bold; color: #ffeb3b; }
+        .loading { color: #00b0ff; font-weight: bold; }
+        .error { color: #ff3d00; font-weight: bold; }
+        .success { color: #00e676; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <h1>Swarali Live Scanner</h1>
     <p>Auto-refreshing every 30 seconds...</p>
+    
+    <!-- Status batane wala naya box -->
+    <div id="status-text" class="loading">⏳ Server se connect ho raha hai... (Please wait)</div>
 
     <table>
         <thead>
@@ -56,43 +68,65 @@
             </tr>
         </thead>
         <tbody id="data-table">
-            <tr><td colspan="4">Fetching live market data... Please wait</td></tr>
+            <tr><td colspan="4" class="loading">Fetching live market data... Data aane me 1-2 minute lag sakte hain.</td></tr>
         </tbody>
     </table>
 
     <script>
-        // Yahan aapka poora aur sahi Render URL daal diya gaya hai
         const API_URL = 'https://swarali-asia.onrender.com/api/signals';
 
         async function fetchMarketData() {
+            const statusText = document.getElementById('status-text');
+            
             try {
                 const response = await fetch(API_URL);
+                
+                if (!response.ok) {
+                    throw new Error("Network issue");
+                }
+                
                 const result = await response.json();
                 
                 let rows = '';
-                result.data.forEach(item => {
-                    let signalClass = 'wait';
-                    if (item.signal === 'ss.b') signalClass = 'buy';
-                    if (item.signal === 'ss.s') signalClass = 'sell';
+                // Agar data list me items hain
+                if (result.data && result.data.length > 0) {
+                    result.data.forEach(item => {
+                        let signalClass = 'wait';
+                        if (item.signal === 'ss.b') signalClass = 'buy';
+                        if (item.signal === 'ss.s') signalClass = 'sell';
+                        
+                        rows += `<tr>
+                            <td class="coin-name">${item.coin}</td>
+                            <td>${item.price}</td>
+                            <td>${item.rsi}</td>
+                            <td class="${signalClass}">${item.signal}</td>
+                        </tr>`;
+                    });
                     
-                    rows += `<tr>
-                        <td class="coin-name">${item.coin}</td>
-                        <td>${item.price}</td>
-                        <td>${item.rsi}</td>
-                        <td class="${signalClass}">${item.signal}</td>
-                    </tr>`;
-                });
+                    document.getElementById('data-table').innerHTML = rows;
+                    
+                    // Time update karein
+                    const now = new Date();
+                    statusText.innerHTML = `✅ Live Data Active - Last Updated: ${now.toLocaleTimeString()}`;
+                    statusText.className = 'success';
+                } else {
+                    // Data fetch ho raha hai par abhi server ne calculate nahi kiya
+                    document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="loading">Data process ho raha hai... Thoda wait karein.</td></tr>`;
+                    statusText.innerHTML = `⏳ Analyzing Coins...`;
+                    statusText.className = 'loading';
+                }
                 
-                document.getElementById('data-table').innerHTML = rows;
             } catch (error) {
                 console.error("Error fetching data:", error);
-                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" style="color:red;">Error loading data. Retrying...</td></tr>`;
+                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="error">Data load nahi ho paya. Server reconnect kar raha hai...</td></tr>`;
+                statusText.innerHTML = `❌ Error! Render server sleep mode me ho sakta hai. 1-2 min wait karein.`;
+                statusText.className = 'error';
             }
         }
 
         // Pehli baar turant load karein
         fetchMarketData();
-        // Phir har 30 second me refresh karein
+        // Har 30 second me refresh karein
         setInterval(fetchMarketData, 30000);
     </script>
 
