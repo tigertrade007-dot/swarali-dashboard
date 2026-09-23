@@ -16,7 +16,6 @@
         h1 { color: #00e676; margin-bottom: 5px; }
         p { color: #aaaaaa; font-size: 14px; margin-bottom: 10px; }
         
-        /* Naya Status Text Style */
         #status-text { font-weight: bold; font-size: 16px; margin-bottom: 20px; padding: 10px; background-color: #1e1e1e; border-radius: 5px; display: inline-block;}
         
         table { 
@@ -40,7 +39,6 @@
         }
         tr:hover { background-color: #2a2a2a; }
         
-        /* Rango ki styling */
         .buy { color: #00e676; font-weight: bold; font-size: 16px; }
         .sell { color: #ff3d00; font-weight: bold; font-size: 16px; }
         .wait { color: #777777; }
@@ -53,10 +51,9 @@
 <body>
 
     <h1>Swarali Live Scanner</h1>
-    <p>Auto-refreshing every 30 seconds...</p>
+    <p>Auto-refreshing every 10 seconds...</p>
     
-    <!-- Status batane wala naya box -->
-    <div id="status-text" class="loading">⏳ Server se connect ho raha hai... (Please wait)</div>
+    <div id="status-text" class="loading">⏳ Connecting to Server... (Please wait)</div>
 
     <table>
         <thead>
@@ -68,7 +65,7 @@
             </tr>
         </thead>
         <tbody id="data-table">
-            <tr><td colspan="4" class="loading">Fetching live market data... Data aane me 1-2 minute lag sakte hain.</td></tr>
+            <tr><td colspan="4" class="loading">Fetching live market data... This may take a minute.</td></tr>
         </tbody>
     </table>
 
@@ -88,7 +85,6 @@
                 const result = await response.json();
                 
                 let rows = '';
-                // Agar data list me items hain
                 if (result.data && result.data.length > 0) {
                     result.data.forEach(item => {
                         let signalClass = 'wait';
@@ -105,29 +101,26 @@
                     
                     document.getElementById('data-table').innerHTML = rows;
                     
-                    // Time update karein
                     const now = new Date();
                     statusText.innerHTML = `✅ Live Data Active - Last Updated: ${now.toLocaleTimeString()}`;
                     statusText.className = 'success';
                 } else {
-                    // Data fetch ho raha hai par abhi server ne calculate nahi kiya
-                    document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="loading">Data process ho raha hai... Thoda wait karein.</td></tr>`;
+                    document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="loading">Processing 40 coins... Please wait.</td></tr>`;
                     statusText.innerHTML = `⏳ Analyzing Coins...`;
                     statusText.className = 'loading';
                 }
                 
             } catch (error) {
                 console.error("Error fetching data:", error);
-                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="error">Data load nahi ho paya. Server reconnect kar raha hai...</td></tr>`;
-                statusText.innerHTML = `❌ Error! Render server sleep mode me ho sakta hai. 1-2 min wait karein.`;
+                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="error">Failed to load data. Retrying...</td></tr>`;
+                statusText.innerHTML = `❌ Error! Server might be asleep. Retrying in 10s...`;
                 statusText.className = 'error';
             }
         }
 
-        // Pehli baar turant load karein
         fetchMarketData();
-        // Har 30 second me refresh karein
-        setInterval(fetchMarketData, 30000);
+        // UI refresh time reduced to 10 seconds for faster updates
+        setInterval(fetchMarketData, 10000);
     </script>
 
 </body>
