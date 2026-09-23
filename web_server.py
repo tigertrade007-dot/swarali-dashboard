@@ -8,19 +8,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
+import traceback
 
 # 1. Telegram Settings 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Top 10 Coins List for FAST loading
+# 2. Top 10 Coins List
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
     "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT"
 ]
 
 TIMEFRAME = '5m'
-REFRESH_INTERVAL_SEC = 10  # Har 10 second me fast scan karega
+REFRESH_INTERVAL_SEC = 10  
 
 app = FastAPI()
 app.add_middleware(
@@ -51,8 +52,8 @@ def send_telegram_alert(coin, signal, rsi_val):
 def calculate_indicators(df):
     # 1. RSI (14)
     delta = df['close'].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
     avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
     rs = avg_gain / avg_loss
@@ -103,12 +104,9 @@ async def fetch_and_analyze(session, coin):
                 
                 signal = "Wait"
                 
-                # BUY LOGIC
                 if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
                     signal = "ss.b"
                     send_telegram_alert(coin, signal, current_rsi)
-                    
-                # SELL LOGIC
                 elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
                     signal = "ss.s"
                     send_telegram_alert(coin, signal, current_rsi)
@@ -119,8 +117,11 @@ async def fetch_and_analyze(session, coin):
                     "rsi": current_rsi if pd.notna(current_rsi) else 0,
                     "signal": signal
                 }
-    except Exception:
-        pass
+            else:
+                print(f"[{coin}] Binance API Error Status: {response.status}")
+    except Exception as e:
+        print(f"[{coin}] Internal Code Error: {e}")
+        traceback.print_exc()
     return None
 
 async def background_scanner():
@@ -144,7 +145,7 @@ async def serve_home():
         with open("index.html", "r") as f:
             return HTMLResponse(content=f.read(), status_code=200)
     except Exception:
-        return HTMLResponse(content="<h1>index.html nahi mili. GitHub me check karein.</h1>", status_code=404)
+        return HTMLResponse(content="<h1>index.html nahi mili.</h1>", status_code=404)
 
 @app.get("/api/signals")
 async def get_signals():
