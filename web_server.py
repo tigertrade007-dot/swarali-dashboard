@@ -14,7 +14,7 @@ import traceback
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Total 40 Coins List
+# 2. Total 40 Coins List (Bybit Linear Futures)
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
     "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", 
@@ -26,8 +26,8 @@ COINS = [
     "CROSSUSDT", "TAOUSDT", "USDT.D", "SLVONUSD", "ALLOUSDT"
 ]
 
-TIMEFRAME = '5m'
-REFRESH_INTERVAL_SEC = 30  
+TIMEFRAME = '5' # Bybit me '5' ka matlab 5 minutes hota hai
+REFRESH_INTERVAL_SEC = 10  # Wapas fast 10 seconds refresh
 
 app = FastAPI()
 app.add_middleware(
@@ -47,7 +47,7 @@ def send_telegram_alert(coin, signal, rsi_val):
             f"🪙 *Coin:* {coin}\n"
             f"📈 *Signal:* {signal}\n"
             f"📊 *RSI Level:* {rsi_val}\n"
-            f"⏱️ *Timeframe:* {TIMEFRAME}"
+            f"⏱️ *Timeframe: 5m*"
         )
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         try:
@@ -88,41 +88,46 @@ def calculate_indicators(df):
     return df
 
 async def fetch_and_analyze(session, coin):
-    # Spot API URL
-    url = f"https://api.binance.com/api/v3/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
+    # NAYA RASTA: Bybit V5 API
+    url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={TIMEFRAME}&limit=100"
     try:
         async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 data = await response.json()
-                df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
-                df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
-                
-                df = calculate_indicators(df)
-                
-                current_price = df['close'].iloc[-1]
-                current_rsi = round(df['RSI'].iloc[-1], 2)
-                current_ema = df['EMA'].iloc[-1]
-                current_adx = df['ADX'].iloc[-1]
-                current_vwap = df['VWAP'].iloc[-1]
-                
-                signal = "Wait"
-                
-                if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
-                    signal = "ss.b"
-                    send_telegram_alert(coin, signal, current_rsi)
-                elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
-                    signal = "ss.s"
-                    send_telegram_alert(coin, signal, current_rsi)
-                
-                return {
-                    "coin": coin,
-                    "price": round(current_price, 4),
-                    "rsi": current_rsi if pd.notna(current_rsi) else 0,
-                    "signal": signal
-                }
-            else:
-                # Agar USDT.D jaisa koi invalid coin ho toh server ignore kar dega
-                pass
+                # Check if Bybit successfully found the coin
+                if data['retCode'] == 0 and data['result']['list']:
+                    klines = data['result']['list']
+                    
+                    # Bybit columns: [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover]
+                    df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
+                    
+                    # Bybit data ulta aata hai (newest first), isliye isko seedha karna zaroori hai
+                    df = df.iloc[::-1].reset_index(drop=True)
+                    df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+                    
+                    df = calculate_indicators(df)
+                    
+                    current_price = df['close'].iloc[-1]
+                    current_rsi = round(df['RSI'].iloc[-1], 2)
+                    current_ema = df['EMA'].iloc[-1]
+                    current_adx = df['ADX'].iloc[-1]
+                    current_vwap = df['VWAP'].iloc[-1]
+                    
+                    signal = "Wait"
+                    
+                    if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
+                        signal = "ss.b"
+                        send_telegram_alert(coin, signal, current_rsi)
+                    elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
+                        signal = "ss.s"
+                        send_telegram_alert(coin, signal, current_rsi)
+                    
+                    return {
+                        "coin": coin,
+                        "price": round(current_price, 4),
+                        "rsi": current_rsi if pd.notna(current_rsi) else 0,
+                        "signal": signal
+                    }
     except Exception as e:
         pass
     return None
@@ -130,19 +135,18 @@ async def fetch_and_analyze(session, coin):
 async def background_scanner():
     global live_market_data
     while True:
-        temp_data = []
         async with aiohttp.ClientSession() as session:
-            for coin in COINS:
-                res = await fetch_and_analyze(session, coin)
-                if res:
-                    temp_data.append(res)
-                # Ban se bachne ke liye 1 second ka delay
-                await asyncio.sleep(1)
-                
-        if temp_data:
-            live_market_data = temp_data
+            # Bina kisi delay ke ek sath 40 requests Bybit ko bhejenge (Super Fast)
+            tasks = [fetch_and_analyze(session, coin) for coin in COINS]
+            results = await asyncio.gather(*tasks)
             
-        print("Swarali Strategy Scan Complete. Next scan in 30 seconds...")
+            # Jo coins invalid hain (jaise USDT.D) unhe hata denge
+            temp_data = [res for res in results if res is not None]
+            
+            if temp_data:
+                live_market_data = temp_data
+                
+        print("Bybit Fast Scan Complete. Next scan in 10 seconds...")
         await asyncio.sleep(REFRESH_INTERVAL_SEC)
 
 @app.on_event("startup")
