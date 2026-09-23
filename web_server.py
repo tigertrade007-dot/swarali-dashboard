@@ -13,20 +13,14 @@ import uvicorn
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Total 40 Coins List
+# 2. Top 10 Coins List for FAST loading
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
-    "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", 
-    "BCHUSDT", "ATOMUSDT", "UNIUSDT", "NEARUSDT", "RUNEUSDT", 
-    "MANAUSDT", "AAVEUSDT", "AXSUSDT", "GALAUSDT", "FILUSDT", 
-    "TRXUSDT", "HYPEUSDT", "PAXGUSDT", "INJUSDT", "ENAUSDT", 
-    "DUSKUSDT", "ARBUSDT", "APTUSDT", "ONDOUSDT", "VVVUSDT", 
-    "SUIUSDT", "OPUSDT", "LABUSDT", "LITUSDT", "SKLUSDT", 
-    "CROSSUSDT", "TAOUSDT", "USDT.D", "SLVONUSD", "ALLOUSDT"
+    "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT"
 ]
 
 TIMEFRAME = '5m'
-REFRESH_INTERVAL_SEC = 30  
+REFRESH_INTERVAL_SEC = 10  # Har 10 second me fast scan karega
 
 app = FastAPI()
 app.add_middleware(
@@ -93,7 +87,7 @@ def calculate_indicators(df):
 async def fetch_and_analyze(session, coin):
     url = f"https://fapi.binance.com/fapi/v1/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
     try:
-        async with session.get(url, timeout=15) as response:
+        async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 data = await response.json()
                 df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
@@ -137,21 +131,20 @@ async def background_scanner():
             results = await asyncio.gather(*tasks)
             live_market_data = [res for res in results if res is not None]
             
-        print("Swarali Strategy Scan Complete. Next scan in 30 seconds...")
+        print("Swarali Strategy Scan Complete. Next scan in 10 seconds...")
         await asyncio.sleep(REFRESH_INTERVAL_SEC)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(background_scanner())
 
-# NAYA CODE: Ye aapki index.html file ko website par dikhayega
 @app.get("/")
 async def serve_home():
     try:
         with open("index.html", "r") as f:
             return HTMLResponse(content=f.read(), status_code=200)
     except Exception:
-        return HTMLResponse(content="<h1>index.html nahi mili</h1>", status_code=404)
+        return HTMLResponse(content="<h1>index.html nahi mili. GitHub me check karein.</h1>", status_code=404)
 
 @app.get("/api/signals")
 async def get_signals():
