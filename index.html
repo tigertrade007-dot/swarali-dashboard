@@ -3,125 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swarali 4-Lines Dashboard</title>
+    <title>Swarali Pro Dashboard - Editable</title>
     <style>
-        body { 
-            background-color: #121212; 
-            color: #ffffff; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            text-align: center; 
-            margin: 0;
-            padding: 20px;
-        }
-        h1 { color: #00e676; margin-bottom: 5px; }
-        p { color: #aaaaaa; font-size: 14px; margin-bottom: 10px; }
+        body { background-color: #1E222D; color: #ffffff; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px;}
+        .settings-box { background-color: #2A2E39; padding: 15px; border-radius: 6px; max-width: 900px; margin: 0 auto 20px auto; display: flex; justify-content: space-around; align-items: center; border: 1px solid #363A45;}
+        .settings-box label { font-size: 13px; color: #9598A1; }
+        .settings-box select, .settings-box input { background: #1E222D; color: #fff; border: 1px solid #363A45; padding: 5px 10px; border-radius: 4px; }
         
-        #status-text { font-weight: bold; font-size: 16px; margin-bottom: 20px; padding: 10px; background-color: #1e1e1e; border-radius: 5px; display: inline-block;}
+        table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background-color: #1E222D; font-size: 14px;}
+        th, td { padding: 10px; border: 1px solid #363A45; }
+        th { background-color: #2A2E39; font-weight: bold; color: #D1D4DC; }
         
-        table { 
-            width: 95%; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            border-collapse: collapse; 
-            background-color: #1e1e1e;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        th, td { 
-            padding: 15px; 
-            border-bottom: 1px solid #333; 
-        }
-        th { 
-            background-color: #2c2c2c; 
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        tr:hover { background-color: #2a2a2a; }
-        
-        .buy { color: #00e676; font-weight: bold; font-size: 16px; }
-        .sell { color: #ff3d00; font-weight: bold; font-size: 16px; }
-        .wait { color: #777777; }
-        .coin-name { font-weight: bold; color: #ffeb3b; }
-        .loading { color: #00b0ff; font-weight: bold; }
-        .error { color: #ff3d00; font-weight: bold; }
-        .success { color: #00e676; font-weight: bold; }
+        .bg-green { background-color: rgba(8, 153, 129, 0.4); color: #00FF00; font-weight: bold; }
+        .bg-red { background-color: rgba(242, 54, 69, 0.4); color: #FF5252; font-weight: bold; }
+        .bg-dark { background-color: #2A2E39; color: #D1D4DC; }
+        .sym-col { font-weight: bold; text-align: left; background-color: #1E222D; color: #E1E3EB; }
     </style>
 </head>
 <body>
+    <h2 style="color: #089981; margin-bottom: 5px;">Swarali RSI 4 Lines Dashboard [LIVE]</h2>
+    <p style="color: #9598A1; font-size: 13px; margin-bottom: 20px;">Editable Bybit Scanner & Ranking System</p>
 
-    <h1>Swarali Live Scanner</h1>
-    <p>Auto-refreshing every 10 seconds...</p>
-    
-    <div id="status-text" class="loading">⏳ Connecting to Server... (Please wait)</div>
+    <!-- Editable Settings Panel -->
+    <div class="settings-box">
+        <div>
+            <label>Timeframe:</label><br>
+            <select id="timeframeSelect" onchange="updateSettings()">
+                <option value="1">1m</option>
+                <option value="5" selected>5m</option>
+                <option value="15">15m</option>
+                <option value="60">1h</option>
+            </select>
+        </div>
+        <div>
+            <label>Min ADX Filter:</label><br>
+            <input type="number" id="minAdx" value="20" min="10" max="50" style="width: 60px;" onchange="updateSettings()">
+        </div>
+        <div>
+            <label>Auto-Refresh:</label><br>
+            <span style="color: #089981; font-weight: bold;">Active (10s)</span>
+        </div>
+    </div>
 
     <table>
         <thead>
             <tr>
-                <th>COIN</th>
-                <th>PRICE</th>
-                <th>RSI (14)</th>
-                <th>SIGNAL</th>
+                <th>SYM</th>
+                <th>RSI</th>
+                <th>ADX</th>
+                <th>DEL (CVD)</th>
+                <th>RNK</th>
+                <th>PRC@TIME</th>
             </tr>
         </thead>
         <tbody id="data-table">
-            <tr><td colspan="4" class="loading">Fetching live market data... This may take a minute.</td></tr>
+            <tr><td colspan="6">Fetching Market Data from Bybit...</td></tr>
         </tbody>
     </table>
 
     <script>
-        const API_URL = 'https://swarali-asia.onrender.com/api/signals';
+        const API_URL = '/api/signals';
+
+        function updateSettings() {
+            console.log("Settings updated locally.");
+        }
 
         async function fetchMarketData() {
-            const statusText = document.getElementById('status-text');
-            
             try {
                 const response = await fetch(API_URL);
-                
-                if (!response.ok) {
-                    throw new Error("Network issue");
-                }
-                
                 const result = await response.json();
-                
                 let rows = '';
-                if (result.data && result.data.length > 0) {
-                    result.data.forEach(item => {
-                        let signalClass = 'wait';
-                        if (item.signal === 'ss.b') signalClass = 'buy';
-                        if (item.signal === 'ss.s') signalClass = 'sell';
-                        
-                        rows += `<tr>
-                            <td class="coin-name">${item.coin}</td>
-                            <td>${item.price}</td>
-                            <td>${item.rsi}</td>
-                            <td class="${signalClass}">${item.signal}</td>
-                        </tr>`;
-                    });
-                    
-                    document.getElementById('data-table').innerHTML = rows;
-                    
-                    const now = new Date();
-                    statusText.innerHTML = `✅ Live Data Active - Last Updated: ${now.toLocaleTimeString()}`;
-                    statusText.className = 'success';
-                } else {
-                    document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="loading">Processing 40 coins... Please wait.</td></tr>`;
-                    statusText.innerHTML = `⏳ Analyzing Coins...`;
-                    statusText.className = 'loading';
-                }
                 
+                result.data.forEach(item => {
+                    let rnkClass = 'bg-dark';
+                    if (item.rnk.includes('B')) rnkClass = 'bg-green';
+                    else if (item.rnk.includes('S')) rnkClass = 'bg-red';
+                    
+                    let cvdClass = item.cvd.includes('-') ? 'bg-red' : 'bg-green';
+                    let rsiClass = item.rsi > 60 ? 'bg-red' : (item.rsi < 40 ? 'bg-green' : 'bg-dark');
+
+                    rows += `<tr>
+                        <td class="sym-col">${item.sym}</td>
+                        <td class="${rsiClass}">${item.rsi}</td>
+                        <td>${item.adx}</td>
+                        <td class="${cvdClass}">${item.cvd}</td>
+                        <td class="${rnkClass}">${item.rnk}</td>
+                        <td>${item.prc_time}</td>
+                    </tr>`;
+                });
+                document.getElementById('data-table').innerHTML = rows;
             } catch (error) {
-                console.error("Error fetching data:", error);
-                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" class="error">Failed to load data. Retrying...</td></tr>`;
-                statusText.innerHTML = `❌ Error! Server might be asleep. Retrying in 10s...`;
-                statusText.className = 'error';
+                console.error("Error loading data:", error);
             }
         }
 
         fetchMarketData();
-        // UI refresh time reduced to 10 seconds for faster updates
         setInterval(fetchMarketData, 10000);
     </script>
-
 </body>
 </html>
