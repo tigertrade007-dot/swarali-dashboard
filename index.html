@@ -3,33 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swarali RSI 4 Lines - Pro Dashboard</title>
+    <title>Swarali RSI 4 Lines - Editable Dashboard</title>
     <style>
         body { background-color: #12161C; color: #D1D4DC; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; text-align: center; }
         h2 { color: #089981; margin-bottom: 5px; }
         
         /* Settings Panel Styling */
-        .settings-container { background-color: #1E222D; border: 1px solid #363A45; border-radius: 8px; max-width: 1100px; margin: 0 auto 20px auto; padding: 15px; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        .settings-container h3 { color: #2962FF; margin-top: 0; border-bottom: 1px solid #363A45; padding-bottom: 8px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 10px; }
+        .settings-container { background-color: #1E222D; border: 1px solid #363A45; border-radius: 8px; max-width: 900px; margin: 0 auto 20px auto; padding: 15px; text-align: left; }
+        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
         .setting-item { background: #2A2E39; padding: 8px 12px; border-radius: 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         .setting-item label { color: #B2B5BE; }
-        .setting-item select, .setting-item input[type="number"], .setting-item input[type="color"] { background: #12161C; color: #fff; border: 1px solid #434651; padding: 4px 8px; border-radius: 3px; font-size: 12px; }
-        .setting-item input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+        .setting-item select, .setting-item input { background: #12161C; color: #fff; border: 1px solid #434651; padding: 4px 8px; border-radius: 3px; font-size: 12px; }
         
         .toggle-btn { background-color: #2962FF; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
         .toggle-btn:hover { background-color: #1e4bd8; }
         
-        #settings-body { display: none; } /* Default collapsed */
+        #settings-body { display: none; }
 
         /* Dashboard Table Styling */
-        table { width: 100%; max-width: 1100px; margin: 0 auto; border-collapse: collapse; background-color: #1E222D; font-size: 13px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; }
+        table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background-color: #1E222D; font-size: 13px; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         th, td { padding: 10px 8px; border-bottom: 1px solid #363A45; }
-        th { background-color: #2A2E39; font-weight: bold; color: #D1D4DC; letter-spacing: 0.5px; }
+        th { background-color: #2A2E39; font-weight: bold; color: #D1D4DC; }
         tr:hover { background-color: #252833; }
         
-        .bg-green { background-color: rgba(8, 153, 129, 0.35); color: #00FF00; font-weight: bold; }
-        .bg-red { background-color: rgba(242, 54, 69, 0.35); color: #FF5252; font-weight: bold; }
+        .bg-green { background-color: rgba(8, 153, 129, 0.4); color: #00FF00; font-weight: bold; }
+        .bg-red { background-color: rgba(242, 54, 69, 0.4); color: #FF5252; font-weight: bold; }
         .bg-dark { background-color: #1E222D; color: #D1D4DC; }
         .sym-col { font-weight: bold; text-align: left; color: #F0F3FA; }
     </style>
@@ -37,81 +35,34 @@
 <body>
 
     <h2>Swarali RSI 4 Lines Dashboard [LIVE]</h2>
-    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">TradingView Indicator Settings & Editable Web Control Panel</p>
+    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">Bybit Scanner with Point-Based Rankings & Editable Settings</p>
 
     <!-- Collapsible Settings Panel -->
-    <button class="toggle-btn" onclick="toggleSettings()">⚙️ Toggle TradingView Settings Panel</button>
+    <button class="toggle-btn" onclick="toggleSettings()">⚙️ Toggle Settings Panel</button>
     
     <div class="settings-container" id="settings-body">
-        <h3>Day Tracking Settings</h3>
+        <h3 style="color: #2962FF; margin-top: 0; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Indicator Parameters</h3>
         <div class="group-grid">
             <div class="setting-item">
-                <label>Track Dashboard For:</label>
-                <select id="daySel">
-                    <option>Auto (5:30AM-4PM Prev, Else Curr)</option>
-                    <option>Auto (5:30AM-1:30PM Prev, Else Curr)</option>
-                    <option>Current Day</option>
-                    <option>Previous Day</option>
+                <label>Timeframe:</label>
+                <select id="tfSelect">
+                    <option value="1">1m</option>
+                    <option value="5" selected>5m</option>
+                    <option value="15">15m</option>
                 </select>
             </div>
-        </div>
-
-        <h3>RSI Lines Settings</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>RSI Length:</label><input type="number" id="rsiLen" value="14" style="width:50px;"></div>
-            <div class="setting-item"><label>Lookback 1 (Long):</label><input type="checkbox" id="lb1On" checked></div>
-            <div class="setting-item"><label>Lookback Bars 1:</label><input type="number" id="lb1Bars" value="300" style="width:60px;"></div>
-            <div class="setting-item"><label>Lookback 2 (Short):</label><input type="checkbox" id="lb2On" checked></div>
-            <div class="setting-item"><label>Lookback Bars 2:</label><input type="number" id="lb2Bars" value="100" style="width:60px;"></div>
-        </div>
-
-        <h3>Auto Trendlines</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>Show Auto Trendlines:</label><input type="checkbox" id="showTL"></div>
-            <div class="setting-item"><label>Pivot Lookback (Swing):</label><input type="number" id="tlPivot" value="10" style="width:50px;"></div>
-        </div>
-
-        <h3>EMA Settings & Dashboard Status</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>EMA 1 (200 Len):</label><input type="checkbox" id="ema1On" checked></div>
-            <div class="setting-item"><label>EMA 2 (100 Len):</label><input type="checkbox" id="ema2On"></div>
-            <div class="setting-item"><label>EMA 3 (50 Len):</label><input type="checkbox" id="ema3On"></div>
-            <div class="setting-item"><label>EMA Reference:</label><select id="emaRef"><option>EMA 1</option><option>EMA 2</option><option>EMA 3</option></select></div>
-        </div>
-
-        <h3>Rank & Scoring Conditions</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>Count CVD Point:</label><input type="checkbox" id="scCvd" checked></div>
-            <div class="setting-item"><label>Count VWAP Point:</label><input type="checkbox" id="scVwap" checked></div>
-            <div class="setting-item"><label>Count OIM Point:</label><input type="checkbox" id="scOim" checked></div>
-            <div class="setting-item"><label>Count ADX (>=20):</label><input type="checkbox" id="scAdx" checked></div>
-            <div class="setting-item"><label>Require Vol Break (SS):</label><input type="checkbox" id="reqVol" checked></div>
-            <div class="setting-item"><label>Require RSI Break (SS):</label><input type="checkbox" id="reqRsi"></div>
-            <div class="setting-item"><label>Show EMA Star (★):</label><input type="checkbox" id="showStar" checked></div>
-        </div>
-
-        <h3>Smart UI & Mobile Settings</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>Dashboard Theme:</label><select id="dashTheme"><option>Dark</option><option>Light</option></select></div>
-            <div class="setting-item"><label>Mobile Mode:</label><input type="checkbox" id="mobMode"></div>
-            <div class="setting-item"><label>Table Position:</label><select id="tabPos"><option>Middle Right</option><option>Top Right</option><option>Bottom Right</option></select></div>
-            <div class="setting-item"><label>Max Coins to Show:</label><input type="number" id="maxRows" value="18" min="1" max="18" style="width:50px;"></div>
-        </div>
-
-        <h3>Dashboard Columns</h3>
-        <div class="group-grid">
-            <div class="setting-item"><label>Show ADX Column:</label><input type="checkbox" id="colAdx" checked></div>
-            <div class="setting-item"><label>Show VWP Column:</label><input type="checkbox" id="colVwp" checked></div>
-            <div class="setting-item"><label>Show EMA Column:</label><input type="checkbox" id="colEma" checked></div>
-            <div class="setting-item"><label>Show RSI Column:</label><input type="checkbox" id="colRsi" checked></div>
-            <div class="setting-item"><label>Show VOL Column:</label><input type="checkbox" id="colVol"></div>
-            <div class="setting-item"><label>Show DEL Column:</label><input type="checkbox" id="colDel" checked></div>
-            <div class="setting-item"><label>Show CVD Div Column:</label><input type="checkbox" id="colCvd" checked></div>
-            <div class="setting-item"><label>Show OIM Column:</label><input type="checkbox" id="colOim" checked></div>
-            <div class="setting-item"><label>Show RNK Column:</label><input type="checkbox" id="colRnk" checked></div>
-            <div class="setting-item"><label>Show PRC@TIME:</label><input type="checkbox" id="colPrc" checked></div>
-            <div class="setting-item"><label>Show TDY Signals:</label><input type="checkbox" id="colTdy" checked></div>
-            <div class="setting-item"><label>Show YST Signals:</label><input type="checkbox" id="colYst" checked></div>
+            <div class="setting-item">
+                <label>Min ADX:</label>
+                <input type="number" id="minAdx" value="20" style="width: 50px;">
+            </div>
+            <div class="setting-item">
+                <label>RSI Length:</label>
+                <input type="number" id="rsiLen" value="14" style="width: 50px;">
+            </div>
+            <div class="setting-item">
+                <label>Theme:</label>
+                <select id="themeSel"><option>Dark</option><option>Light</option></select>
+            </div>
         </div>
     </div>
 
@@ -120,29 +71,22 @@
         <thead>
             <tr>
                 <th>SYM</th>
+                <th>RSI</th>
                 <th>ADX</th>
-                <th>VWP</th>
-                <th>EMA</th>
-                <th>DEL (DEL)</th>
+                <th>DEL (CVD)</th>
                 <th>RNK</th>
                 <th>PRC@TIME</th>
-                <th>TDY</th>
-                <th>YST</th>
             </tr>
         </thead>
         <tbody id="data-table">
-            <tr><td colspan="9">Loading Market Data...</td></tr>
+            <tr><td colspan="6">Fetching Market Data from Bybit...</td></tr>
         </tbody>
     </table>
 
     <script>
         function toggleSettings() {
             var x = document.getElementById("settings-body");
-            if (x.style.display === "block") {
-                x.style.display = "none";
-            } else {
-                x.style.display = "block";
-            }
+            x.style.display = (x.style.display === "block") ? "none" : "block";
         }
 
         const API_URL = '/api/signals';
@@ -159,23 +103,21 @@
                         if (item.rnk.includes('B')) rnkClass = 'bg-green';
                         else if (item.rnk.includes('S')) rnkClass = 'bg-red';
                         
-                        let delClass = item.del && item.del.includes('-') ? 'bg-red' : 'bg-green';
+                        let cvdClass = item.cvd.includes('-') ? 'bg-red' : 'bg-green';
+                        let rsiClass = item.rsi > 60 ? 'bg-red' : (item.rsi < 40 ? 'bg-green' : 'bg-dark');
 
                         rows += `<tr>
                             <td class="sym-col">${item.sym}</td>
-                            <td>${item.adx || '-'}</td>
-                            <td>${item.vwp || '-'}</td>
-                            <td>${item.ema || '-'}</td>
-                            <td class="${delClass}">${item.del || '0'}</td>
+                            <td class="${rsiClass}">${item.rsi}</td>
+                            <td>${item.adx}</td>
+                            <td class="${cvdClass}">${item.cvd}</td>
                             <td class="${rnkClass}">${item.rnk}</td>
                             <td>${item.prc_time}</td>
-                            <td>🟢${item.tdy_b || 0} 🔴${item.tdy_s || 0}</td>
-                            <td>🟢${item.yst_b || 0} 🔴${item.yst_s || 0}</td>
                         </tr>`;
                     });
                     document.getElementById('data-table').innerHTML = rows;
                 } else {
-                    document.getElementById('data-table').innerHTML = `<tr><td colspan="9">No data found or scanning in progress...</td></tr>`;
+                    document.getElementById('data-table').innerHTML = `<tr><td colspan="6">Scanning coins... Please wait.</td></tr>`;
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
