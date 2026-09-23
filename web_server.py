@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
@@ -13,11 +13,16 @@ from datetime import datetime
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+# 18 Coins List as per your TradingView settings
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", 
     "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "TRXUSDT", 
-    "LTCUSDT", "BCHUSDT", "NEARUSDT", "UNIUSDT", "ATOMUSDT"
+    "LTCUSDT", "BCHUSDT", "NEARUSDT", "UNIUSDT", "ATOMUSDT",
+    "MATICUSDT", "FTMUSDT", "NEARUSDT"
 ]
+
+TIMEFRAME = '5' 
+REFRESH_INTERVAL_SEC = 10  
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -25,7 +30,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 live_market_data = []
 
 def calculate_indicators(df):
-    # RSI (14)
+    # 1. RSI (14)
     delta = df['close'].diff()
     gain = delta.where(delta > 0, 0.0)
     loss = -delta.where(delta < 0, 0.0)
@@ -33,15 +38,15 @@ def calculate_indicators(df):
     avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
     df['RSI'] = 100 - (100 / (1 + (avg_gain / avg_loss)))
 
-    # EMA (200 & 50)
+    # 2. EMA (200 & 50)
     df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
     df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
 
-    # VWAP
+    # 3. VWAP
     typical_price = (df['high'] + df['low'] + df['close']) / 3
     df['VWAP'] = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
 
-    # ADX (14)
+    # 4. ADX (14)
     tr1 = df['high'] - df['low']
     tr2 = (df['high'] - df['close'].shift(1)).abs()
     tr3 = (df['low'] - df['close'].shift(1)).abs()
@@ -56,14 +61,14 @@ def calculate_indicators(df):
     dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
     df['ADX'] = dx.ewm(alpha=1/14, adjust=False).mean()
 
-    # CVD (Cumulative Delta Approx)
+    # 5. CVD (Cumulative Volume Delta Approximation)
     df['Approx_Delta'] = np.where(df['high'] == df['low'], 0, df['volume'] * (2 * df['close'] - df['high'] - df['low']) / (df['high'] - df['low']))
     df['CVD'] = df['Approx_Delta'].cumsum()
 
     return df
 
-async def fetch_and_analyze(session, coin, timeframe='5'):
-    url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={timeframe}&limit=200"
+async def fetch_and_analyze(session, coin):
+    url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={TIMEFRAME}&limit=200"
     try:
         async with session.get(url, timeout=10) as response:
             if response.status == 200:
@@ -84,27 +89,27 @@ async def fetch_and_analyze(session, coin, timeframe='5'):
                     adx = df['ADX'].iloc[-1]
                     cvd = df['CVD'].iloc[-1]
                     
-                    # Point System Calculation (CVD, VWAP, EMA, ADX)
+                    # Base Points Calculation (CVD, VWAP, EMA Trend, ADX >= 20)
                     buy_pts = sum([cvd > 0, c > vwap, c > ema, adx >= 20])
                     sell_pts = sum([cvd < 0, c < vwap, c < ema, adx >= 20])
                     
-                    # Breakout checks
+                    # Breakout Checks
                     vol_breakout = df['volume'].iloc[-1] > df['volume'].shift(1).rolling(20).max().iloc[-1]
+                    rsi_breakout_buy = rsi < 35
+                    rsi_breakout_sell = rsi > 65
                     
+                    # Ranking System Logic
                     rk_str = "-"
-                    # Level 2 (Strong)
                     if buy_pts >= 3:
-                        rk_str = "S.B"
-                        if vol_breakout:
+                        if vol_breakout or rsi_breakout_buy:
                             rk_str = "SS.B"
-                        if rsi < 35:
-                            rk_str = "SSS.B"
+                        else:
+                            rk_str = "S.B"
                     elif sell_pts >= 3:
-                        rk_str = "S.S"
-                        if vol_breakout:
+                        if vol_breakout or rsi_breakout_sell:
                             rk_str = "SS.S"
-                        if rsi > 65:
-                            rk_str = "SSS.S"
+                        else:
+                            rk_str = "S.S"
                     elif buy_pts == 2 or vol_breakout:
                         rk_str = "B"
                     elif sell_pts == 2 or vol_breakout:
@@ -112,9 +117,9 @@ async def fetch_and_analyze(session, coin, timeframe='5'):
 
                     # EMA Star (★) Confluence Filter
                     star = ""
-                    if rk_str in ["SS.B", "S.B", "SSS.B"] and c > ema200:
+                    if rk_str in ["SS.B", "S.B"] and c > ema200:
                         star = " ★"
-                    elif rk_str in ["SS.S", "S.S", "SSS.S"] and c < ema200:
+                    elif rk_str in ["SS.S", "S.S"] and c < ema200:
                         star = " ★"
 
                     return {
@@ -138,7 +143,7 @@ async def background_scanner():
             temp_data = [res for res in results if res is not None]
             if temp_data:
                 live_market_data = temp_data
-        await asyncio.sleep(10)
+        await asyncio.sleep(REFRESH_INTERVAL_SEC)
 
 @app.on_event("startup")
 async def startup_event():
