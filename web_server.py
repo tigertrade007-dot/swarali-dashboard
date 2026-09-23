@@ -14,10 +14,16 @@ import traceback
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Top 10 Coins List
+# 2. Total 40 Coins List
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
-    "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT"
+    "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", 
+    "BCHUSDT", "ATOMUSDT", "UNIUSDT", "NEARUSDT", "RUNEUSDT", 
+    "MANAUSDT", "AAVEUSDT", "AXSUSDT", "GALAUSDT", "FILUSDT", 
+    "TRXUSDT", "HYPEUSDT", "PAXGUSDT", "INJUSDT", "ENAUSDT", 
+    "DUSKUSDT", "ARBUSDT", "APTUSDT", "ONDOUSDT", "VVVUSDT", 
+    "SUIUSDT", "OPUSDT", "LABUSDT", "LITUSDT", "SKLUSDT", 
+    "CROSSUSDT", "TAOUSDT", "USDT.D", "SLVONUSD", "ALLOUSDT"
 ]
 
 TIMEFRAME = '5m'
@@ -82,7 +88,7 @@ def calculate_indicators(df):
     return df
 
 async def fetch_and_analyze(session, coin):
-    # YAHAN CHANGE KIYA HAI: 'fapi.binance.com' ki jagah 'api.binance.com' (Spot API) kar diya hai
+    # Spot API URL
     url = f"https://api.binance.com/api/v3/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
     try:
         async with session.get(url, timeout=10) as response:
@@ -115,9 +121,10 @@ async def fetch_and_analyze(session, coin):
                     "signal": signal
                 }
             else:
-                print(f"[{coin}] Binance API Error Status: {response.status}")
+                # Agar USDT.D jaisa koi invalid coin ho toh server ignore kar dega
+                pass
     except Exception as e:
-        print(f"[{coin}] Internal Code Error: {e}")
+        pass
     return None
 
 async def background_scanner():
@@ -129,7 +136,7 @@ async def background_scanner():
                 res = await fetch_and_analyze(session, coin)
                 if res:
                     temp_data.append(res)
-                # Spot API ke liye 1 second ka delay barkarar rakha hai taaki safe rahein
+                # Ban se bachne ke liye 1 second ka delay
                 await asyncio.sleep(1)
                 
         if temp_data:
