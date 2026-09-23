@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
@@ -13,12 +13,11 @@ from datetime import datetime
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 18 Coins List as per your TradingView settings
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", 
     "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "TRXUSDT", 
     "LTCUSDT", "BCHUSDT", "NEARUSDT", "UNIUSDT", "ATOMUSDT",
-    "MATICUSDT", "FTMUSDT", "NEARUSDT"
+    "MATICUSDT", "FTMUSDT"
 ]
 
 TIMEFRAME = '5' 
@@ -67,7 +66,7 @@ def calculate_indicators(df):
 
     return df
 
-async def fetch_and_analyze(session, coin):
+async def fetch_and_analyze(session, coin, use_cvd, use_vwap, use_oim, use_adx, req_vol, req_rsi, show_star):
     url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={TIMEFRAME}&limit=200"
     try:
         async with session.get(url, timeout=10) as response:
@@ -89,37 +88,67 @@ async def fetch_and_analyze(session, coin):
                     adx = df['ADX'].iloc[-1]
                     cvd = df['CVD'].iloc[-1]
                     
-                    # Base Points Calculation (CVD, VWAP, EMA Trend, ADX >= 20)
-                    buy_pts = sum([cvd > 0, c > vwap, c > ema, adx >= 20])
-                    sell_pts = sum([cvd < 0, c < vwap, c < ema, adx >= 20])
+                    # OIM Approximation (Long Build-up "LB" if price > open & cvd > 0, else Short Build-up "SB")
+                    oim = "LB" if (c > df['open'].iloc[-1] and cvd > 0) else ("SB" if (c < df['open'].iloc[-1] and cvd < 0) else "-")
+
+                    # Dynamic Point Counting based on Checkboxes
+                    buy_pts = 0
+                    sell_pts = 0
                     
+                    if use_cvd:
+                        if cvd > 0: buy_pts += 1
+                        elif cvd < 0: sell_pts += 1
+                    if use_vwap:
+                        if c > vwap: buy_pts += 1
+                        elif c < vwap: sell_pts += 1
+                    if use_oim:
+                        if oim == "LB": buy_pts += 1
+                        elif oim == "SB": sell_pts += 1
+                    if use_adx:
+                        if adx >= 20.0:
+                            buy_pts += 1
+                            sell_pts += 1
+
+                    total_conditions = sum([use_cvd, use_vwap, use_oim, use_adx])
+                    req_points = 3 if total_conditions >= 4 else (2 if total_conditions == 3 else total_conditions)
+                    if req_points < 1: req_points = 1
+
                     # Breakout Checks
                     vol_breakout = df['volume'].iloc[-1] > df['volume'].shift(1).rolling(20).max().iloc[-1]
                     rsi_breakout_buy = rsi < 35
                     rsi_breakout_sell = rsi > 65
+
+                    is_l2_buy = (total_conditions > 0 and buy_pts >= req_points)
+                    is_l2_sell = (total_conditions > 0 and sell_pts >= req_points)
+
+                    # Super Strong (SS) Validation based on user toggles
+                    vol_cond_buy = vol_breakout if req_vol else True
+                    rsi_cond_buy = rsi_breakout_buy if req_rsi else True
                     
-                    # Ranking System Logic
+                    vol_cond_sell = vol_breakout if req_vol else True
+                    rsi_cond_sell = rsi_breakout_sell if req_rsi else True
+
                     rk_str = "-"
-                    if buy_pts >= 3:
-                        if vol_breakout or rsi_breakout_buy:
+                    if is_l2_buy:
+                        if (req_vol or req_rsi) and (vol_cond_buy and rsi_cond_buy):
                             rk_str = "SS.B"
                         else:
                             rk_str = "S.B"
-                    elif sell_pts >= 3:
-                        if vol_breakout or rsi_breakout_sell:
+                    elif is_l2_sell:
+                        if (req_vol or req_rsi) and (vol_cond_sell and rsi_cond_sell):
                             rk_str = "SS.S"
                         else:
                             rk_str = "S.S"
-                    elif buy_pts == 2 or vol_breakout:
+                    elif vol_breakout:
                         rk_str = "B"
-                    elif sell_pts == 2 or vol_breakout:
+                    elif vol_breakout:
                         rk_str = "S"
 
                     # EMA Star (★) Confluence Filter
                     star = ""
-                    if rk_str in ["SS.B", "S.B"] and c > ema200:
+                    if show_star and rk_str in ["SS.B", "S.B"] and c > ema200:
                         star = " ★"
-                    elif rk_str in ["SS.S", "S.S"] and c < ema200:
+                    elif show_star and rk_str in ["SS.S", "S.S"] and c < ema200:
                         star = " ★"
 
                     return {
@@ -134,23 +163,45 @@ async def fetch_and_analyze(session, coin):
         pass
     return None
 
-async def background_scanner():
+async def background_scanner(params_dict):
     global live_market_data
     while True:
+        use_cvd = params_dict.get("use_cvd", "true") == "true"
+        use_vwap = params_dict.get("use_vwap", "true") == "true"
+        use_oim = params_dict.get("use_oim", "true") == "true"
+        use_adx = params_dict.get("use_adx", "true") == "true"
+        req_vol = params_dict.get("req_vol", "true") == "true"
+        req_rsi = params_dict.get("req_rsi", "false") == "true"
+        show_star = params_dict.get("show_star", "true") == "true"
+
         async with aiohttp.ClientSession() as session:
-            tasks = [fetch_and_analyze(session, coin) for coin in COINS]
+            tasks = [fetch_and_analyze(session, coin, use_cvd, use_vwap, use_oim, use_adx, req_vol, req_rsi, show_star) for coin in COINS]
             results = await asyncio.gather(*tasks)
             temp_data = [res for res in results if res is not None]
             if temp_data:
                 live_market_data = temp_data
         await asyncio.sleep(REFRESH_INTERVAL_SEC)
 
+scanner_task = None
+
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(background_scanner())
+    global scanner_task
+    default_params = {"use_cvd": "true", "use_vwap": "true", "use_oim": "true", "use_adx": "true", "req_vol": "true", "req_rsi": "false", "show_star": "true"}
+    scanner_task = asyncio.create_task(background_scanner(default_params))
 
 @app.get("/api/signals")
-async def get_signals():
+async def get_signals(
+    use_cvd: str = "true", 
+    use_vwap: str = "true", 
+    use_oim: str = "true", 
+    use_adx: str = "true", 
+    req_vol: str = "true", 
+    req_rsi: str = "false", 
+    show_star: str = "true"
+):
+    global scanner_task
+    # Update running background scanner parameters dynamically if needed
     return {"data": live_market_data}
 
 @app.get("/")
