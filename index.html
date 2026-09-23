@@ -61,8 +61,8 @@
     </table>
 
     <script>
-        // Relative API URL - backend se seedha connect hoga
-        const API_URL = '/api/signals';
+        // Yahan aapka poora aur sahi Render URL daal diya gaya hai
+        const API_URL = 'https://swarali-asia.onrender.com/api/signals';
 
         async function fetchMarketData() {
             try {
@@ -86,13 +86,13 @@
                 document.getElementById('data-table').innerHTML = rows;
             } catch (error) {
                 console.error("Error fetching data:", error);
-                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" style="color:red;">Error loading data. Server sleeping or URL incorrect.</td></tr>`;
+                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" style="color:red;">Error loading data. Retrying...</td></tr>`;
             }
         }
 
         // Pehli baar turant load karein
         fetchMarketData();
-        // Har 30 second me refresh karein (30000 ms)
+        // Phir har 30 second me refresh karein
         setInterval(fetchMarketData, 30000);
     </script>
 
