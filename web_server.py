@@ -21,7 +21,6 @@ COINS = [
 ]
 
 TIMEFRAME = '5m'
-# Refresh time wapas 30 seconds kar rahe hain taaki Binance block na kare
 REFRESH_INTERVAL_SEC = 30  
 
 app = FastAPI()
@@ -83,7 +82,8 @@ def calculate_indicators(df):
     return df
 
 async def fetch_and_analyze(session, coin):
-    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
+    # YAHAN CHANGE KIYA HAI: 'fapi.binance.com' ki jagah 'api.binance.com' (Spot API) kar diya hai
+    url = f"https://api.binance.com/api/v3/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
     try:
         async with session.get(url, timeout=10) as response:
             if response.status == 200:
@@ -125,15 +125,13 @@ async def background_scanner():
     while True:
         temp_data = []
         async with aiohttp.ClientSession() as session:
-            # Har coin ko ek-ek karke fetch karenge, taaki ban na lage
             for coin in COINS:
                 res = await fetch_and_analyze(session, coin)
                 if res:
                     temp_data.append(res)
-                # Binance filter se bachne ke liye har coin ke beech 1 second ka delay
+                # Spot API ke liye 1 second ka delay barkarar rakha hai taaki safe rahein
                 await asyncio.sleep(1)
                 
-        # Jab saara data aa jaye, tabhi live list update karein
         if temp_data:
             live_market_data = temp_data
             
