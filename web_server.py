@@ -4,131 +4,128 @@ import asyncio
 import aiohttp
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
-import traceback
+from datetime import datetime
 
-# 1. Telegram Settings 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Total 40 Coins List (Bybit Linear Futures)
 COINS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
-    "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", 
-    "BCHUSDT", "ATOMUSDT", "UNIUSDT", "NEARUSDT", "RUNEUSDT", 
-    "MANAUSDT", "AAVEUSDT", "AXSUSDT", "GALAUSDT", "FILUSDT", 
-    "TRXUSDT", "HYPEUSDT", "PAXGUSDT", "INJUSDT", "ENAUSDT", 
-    "DUSKUSDT", "ARBUSDT", "APTUSDT", "ONDOUSDT", "VVVUSDT", 
-    "SUIUSDT", "OPUSDT", "LABUSDT", "LITUSDT", "SKLUSDT", 
-    "CROSSUSDT", "TAOUSDT", "USDT.D", "SLVONUSD", "ALLOUSDT"
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", 
+    "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "TRXUSDT", 
+    "LTCUSDT", "BCHUSDT", "NEARUSDT", "UNIUSDT", "ATOMUSDT"
 ]
 
-TIMEFRAME = '5' # Bybit me '5' ka matlab 5 minutes hota hai
-REFRESH_INTERVAL_SEC = 10  # Wapas fast 10 seconds refresh
-
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
-    allow_headers=["*"]
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 live_market_data = []
 
-def send_telegram_alert(coin, signal, rsi_val):
-    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-        message = (
-            f"🚨 *Swarali 4-Lines Alert* 🚨\n\n"
-            f"🪙 *Coin:* {coin}\n"
-            f"📈 *Signal:* {signal}\n"
-            f"📊 *RSI Level:* {rsi_val}\n"
-            f"⏱️ *Timeframe: 5m*"
-        )
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        try:
-            requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}, timeout=5)
-        except Exception:
-            pass
-
 def calculate_indicators(df):
+    # RSI (14)
     delta = df['close'].diff()
     gain = delta.where(delta > 0, 0.0)
     loss = -delta.where(delta < 0, 0.0)
     avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
-    rs = avg_gain / avg_loss
-    df['RSI'] = 100 - (100 / (1 + rs))
+    df['RSI'] = 100 - (100 / (1 + (avg_gain / avg_loss)))
 
-    df['EMA'] = df['close'].ewm(span=50, adjust=False).mean()
+    # EMA (200 & 50)
+    df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
+    df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
 
+    # VWAP
     typical_price = (df['high'] + df['low'] + df['close']) / 3
     df['VWAP'] = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
 
+    # ADX (14)
     tr1 = df['high'] - df['low']
     tr2 = (df['high'] - df['close'].shift(1)).abs()
     tr3 = (df['low'] - df['close'].shift(1)).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    
     up = df['high'] - df['high'].shift(1)
     down = df['low'].shift(1) - df['low']
     plus_dm = np.where((up > down) & (up > 0), up, 0.0)
     minus_dm = np.where((down > up) & (down > 0), down, 0.0)
-    
     atr = tr.ewm(alpha=1/14, adjust=False).mean()
     plus_di = 100 * (pd.Series(plus_dm, index=df.index).ewm(alpha=1/14, adjust=False).mean() / atr)
     minus_di = 100 * (pd.Series(minus_dm, index=df.index).ewm(alpha=1/14, adjust=False).mean() / atr)
     dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
     df['ADX'] = dx.ewm(alpha=1/14, adjust=False).mean()
 
+    # CVD (Cumulative Delta Approx)
+    df['Approx_Delta'] = np.where(df['high'] == df['low'], 0, df['volume'] * (2 * df['close'] - df['high'] - df['low']) / (df['high'] - df['low']))
+    df['CVD'] = df['Approx_Delta'].cumsum()
+
     return df
 
-async def fetch_and_analyze(session, coin):
-    # NAYA RASTA: Bybit V5 API
-    url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={TIMEFRAME}&limit=100"
+async def fetch_and_analyze(session, coin, timeframe='5'):
+    url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={coin}&interval={timeframe}&limit=200"
     try:
         async with session.get(url, timeout=10) as response:
             if response.status == 200:
                 data = await response.json()
-                # Check if Bybit successfully found the coin
                 if data['retCode'] == 0 and data['result']['list']:
                     klines = data['result']['list']
-                    
-                    # Bybit columns: [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover]
                     df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
-                    
-                    # Bybit data ulta aata hai (newest first), isliye isko seedha karna zaroori hai
                     df = df.iloc[::-1].reset_index(drop=True)
                     df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
                     
                     df = calculate_indicators(df)
                     
-                    current_price = df['close'].iloc[-1]
-                    current_rsi = round(df['RSI'].iloc[-1], 2)
-                    current_ema = df['EMA'].iloc[-1]
-                    current_adx = df['ADX'].iloc[-1]
-                    current_vwap = df['VWAP'].iloc[-1]
+                    c = df['close'].iloc[-1]
+                    rsi = df['RSI'].iloc[-1]
+                    vwap = df['VWAP'].iloc[-1]
+                    ema = df['EMA50'].iloc[-1]
+                    ema200 = df['EMA200'].iloc[-1]
+                    adx = df['ADX'].iloc[-1]
+                    cvd = df['CVD'].iloc[-1]
                     
-                    signal = "Wait"
+                    # Point System Calculation (CVD, VWAP, EMA, ADX)
+                    buy_pts = sum([cvd > 0, c > vwap, c > ema, adx >= 20])
+                    sell_pts = sum([cvd < 0, c < vwap, c < ema, adx >= 20])
                     
-                    if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
-                        signal = "ss.b"
-                        send_telegram_alert(coin, signal, current_rsi)
-                    elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
-                        signal = "ss.s"
-                        send_telegram_alert(coin, signal, current_rsi)
+                    # Breakout checks
+                    vol_breakout = df['volume'].iloc[-1] > df['volume'].shift(1).rolling(20).max().iloc[-1]
                     
+                    rk_str = "-"
+                    # Level 2 (Strong)
+                    if buy_pts >= 3:
+                        rk_str = "S.B"
+                        if vol_breakout:
+                            rk_str = "SS.B"
+                        if rsi < 35:
+                            rk_str = "SSS.B"
+                    elif sell_pts >= 3:
+                        rk_str = "S.S"
+                        if vol_breakout:
+                            rk_str = "SS.S"
+                        if rsi > 65:
+                            rk_str = "SSS.S"
+                    elif buy_pts == 2 or vol_breakout:
+                        rk_str = "B"
+                    elif sell_pts == 2 or vol_breakout:
+                        rk_str = "S"
+
+                    # EMA Star (★) Confluence Filter
+                    star = ""
+                    if rk_str in ["SS.B", "S.B", "SSS.B"] and c > ema200:
+                        star = " ★"
+                    elif rk_str in ["SS.S", "S.S", "SSS.S"] and c < ema200:
+                        star = " ★"
+
                     return {
-                        "coin": coin,
-                        "price": round(current_price, 4),
-                        "rsi": current_rsi if pd.notna(current_rsi) else 0,
-                        "signal": signal
+                        "sym": coin.replace("USDT", "") + star,
+                        "rsi": round(rsi, 1),
+                        "adx": round(adx, 1),
+                        "cvd": f"{cvd/1000:.1f}K",
+                        "rnk": rk_str,
+                        "prc_time": f"{c} @{datetime.now().strftime('%H:%M')}" if rk_str != "-" else "-"
                     }
-    except Exception as e:
+    except Exception:
         pass
     return None
 
@@ -136,34 +133,25 @@ async def background_scanner():
     global live_market_data
     while True:
         async with aiohttp.ClientSession() as session:
-            # Bina kisi delay ke ek sath 40 requests Bybit ko bhejenge (Super Fast)
             tasks = [fetch_and_analyze(session, coin) for coin in COINS]
             results = await asyncio.gather(*tasks)
-            
-            # Jo coins invalid hain (jaise USDT.D) unhe hata denge
             temp_data = [res for res in results if res is not None]
-            
             if temp_data:
                 live_market_data = temp_data
-                
-        print("Bybit Fast Scan Complete. Next scan in 10 seconds...")
-        await asyncio.sleep(REFRESH_INTERVAL_SEC)
+        await asyncio.sleep(10)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(background_scanner())
 
-@app.get("/")
-async def serve_home():
-    try:
-        with open("index.html", "r") as f:
-            return HTMLResponse(content=f.read(), status_code=200)
-    except Exception:
-        return HTMLResponse(content="<h1>index.html nahi mili.</h1>", status_code=404)
-
 @app.get("/api/signals")
 async def get_signals():
     return {"data": live_market_data}
+
+@app.get("/")
+async def serve_home():
+    with open("index.html", "r") as f:
+        return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
