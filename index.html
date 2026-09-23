@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swarali RSI 4 Lines - Editable Dashboard</title>
+    <title>Swarali RSI 4 Lines - Pro Dashboard</title>
     <style>
         body { background-color: #12161C; color: #D1D4DC; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; text-align: center; }
         h2 { color: #089981; margin-bottom: 5px; }
         
         /* Settings Panel Styling */
         .settings-container { background-color: #1E222D; border: 1px solid #363A45; border-radius: 8px; max-width: 900px; margin: 0 auto 20px auto; padding: 15px; text-align: left; }
-        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
         .setting-item { background: #2A2E39; padding: 8px 12px; border-radius: 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
-        .setting-item label { color: #B2B5BE; }
-        .setting-item select, .setting-item input { background: #12161C; color: #fff; border: 1px solid #434651; padding: 4px 8px; border-radius: 3px; font-size: 12px; }
+        .setting-item label { color: #B2B5BE; cursor: pointer; }
+        .setting-item input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
         
         .toggle-btn { background-color: #2962FF; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
         .toggle-btn:hover { background-color: #1e4bd8; }
@@ -35,33 +35,41 @@
 <body>
 
     <h2>Swarali RSI 4 Lines Dashboard [LIVE]</h2>
-    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">Bybit Scanner with Point-Based Rankings & Editable Settings</p>
+    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">Rank & Scoring Conditions Control Panel</p>
 
     <!-- Collapsible Settings Panel -->
-    <button class="toggle-btn" onclick="toggleSettings()">⚙️ Toggle Settings Panel</button>
+    <button class="toggle-btn" onclick="toggleSettings()">🏆 Toggle Rank & Scoring Conditions</button>
     
     <div class="settings-container" id="settings-body">
-        <h3 style="color: #2962FF; margin-top: 0; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Indicator Parameters</h3>
+        <h3 style="color: #089981; margin-top: 0; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Rank & Scoring Conditions</h3>
         <div class="group-grid">
             <div class="setting-item">
-                <label>Timeframe:</label>
-                <select id="tfSelect">
-                    <option value="1">1m</option>
-                    <option value="5" selected>5m</option>
-                    <option value="15">15m</option>
-                </select>
+                <label for="chkCvd">Count CVD (Delta) Point</label>
+                <input type="checkbox" id="chkCvd" checked onchange="fetchMarketData()">
             </div>
             <div class="setting-item">
-                <label>Min ADX:</label>
-                <input type="number" id="minAdx" value="20" style="width: 50px;">
+                <label for="chkVwap">Count VWAP Point</label>
+                <input type="checkbox" id="chkVwap" checked onchange="fetchMarketData()">
             </div>
             <div class="setting-item">
-                <label>RSI Length:</label>
-                <input type="number" id="rsiLen" value="14" style="width: 50px;">
+                <label for="chkOim">Count OIM Point</label>
+                <input type="checkbox" id="chkOim" checked onchange="fetchMarketData()">
             </div>
             <div class="setting-item">
-                <label>Theme:</label>
-                <select id="themeSel"><option>Dark</option><option>Light</option></select>
+                <label for="chkAdx">Count ADX (>20) Point</label>
+                <input type="checkbox" id="chkAdx" checked onchange="fetchMarketData()">
+            </div>
+            <div class="setting-item">
+                <label for="chkReqVol">Require Daily Vol Break (SS)</label>
+                <input type="checkbox" id="chkReqVol" checked onchange="fetchMarketData()">
+            </div>
+            <div class="setting-item">
+                <label for="chkReqRsi">Require RSI Break (SS)</label>
+                <input type="checkbox" id="chkReqRsi" onchange="fetchMarketData()">
+            </div>
+            <div class="setting-item">
+                <label for="chkStar">Show High-Timeframe EMA Star (★)</label>
+                <input type="checkbox" id="chkStar" checked onchange="fetchMarketData()">
             </div>
         </div>
     </div>
@@ -89,11 +97,27 @@
             x.style.display = (x.style.display === "block") ? "none" : "block";
         }
 
-        const API_URL = '/api/signals';
-
         async function fetchMarketData() {
+            const useCvd = document.getElementById('chkCvd').checked;
+            const useVwap = document.getElementById('chkVwap').checked;
+            const useOim = document.getElementById('chkOim').checked;
+            const useAdx = document.getElementById('chkAdx').checked;
+            const reqVol = document.getElementById('chkReqVol').checked;
+            const reqRsi = document.getElementById('chkReqRsi').checked;
+            const showStar = document.getElementById('chkStar').checked;
+
+            const queryParams = new URLSearchParams({
+                use_cvd: useCvd,
+                use_vwap: useVwap,
+                use_oim: useOim,
+                use_adx: useAdx,
+                req_vol: reqVol,
+                req_rsi: reqRsi,
+                show_star: showStar
+            });
+
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(`/api/signals?${queryParams.toString()}`);
                 const result = await response.json();
                 let rows = '';
                 
