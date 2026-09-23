@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import uvicorn
 
 # 1. Telegram Settings 
@@ -54,7 +55,6 @@ def send_telegram_alert(coin, signal, rsi_val):
             pass
 
 def calculate_indicators(df):
-    """Bina kisi external library ke pure Math se Indicators nikalna"""
     # 1. RSI (14)
     delta = df['close'].diff()
     gain = delta.where(delta > 0, 0)
@@ -99,7 +99,6 @@ async def fetch_and_analyze(session, coin):
                 df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
                 df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
                 
-                # Naya mathematical engine run karein
                 df = calculate_indicators(df)
                 
                 current_price = df['close'].iloc[-1]
@@ -110,12 +109,12 @@ async def fetch_and_analyze(session, coin):
                 
                 signal = "Wait"
                 
-                # BUY LOGIC (ss.b)
+                # BUY LOGIC
                 if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
                     signal = "ss.b"
                     send_telegram_alert(coin, signal, current_rsi)
                     
-                # SELL LOGIC (ss.s)
+                # SELL LOGIC
                 elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
                     signal = "ss.s"
                     send_telegram_alert(coin, signal, current_rsi)
@@ -144,6 +143,15 @@ async def background_scanner():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(background_scanner())
+
+# NAYA CODE: Ye aapki index.html file ko website par dikhayega
+@app.get("/")
+async def serve_home():
+    try:
+        with open("index.html", "r") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    except Exception:
+        return HTMLResponse(content="<h1>index.html nahi mili</h1>", status_code=404)
 
 @app.get("/api/signals")
 async def get_signals():
