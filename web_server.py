@@ -21,7 +21,8 @@ COINS = [
 ]
 
 TIMEFRAME = '5m'
-REFRESH_INTERVAL_SEC = 10  
+# Refresh time wapas 30 seconds kar rahe hain taaki Binance block na kare
+REFRESH_INTERVAL_SEC = 30  
 
 app = FastAPI()
 app.add_middleware(
@@ -50,7 +51,6 @@ def send_telegram_alert(coin, signal, rsi_val):
             pass
 
 def calculate_indicators(df):
-    # 1. RSI (14)
     delta = df['close'].diff()
     gain = delta.where(delta > 0, 0.0)
     loss = -delta.where(delta < 0, 0.0)
@@ -59,14 +59,11 @@ def calculate_indicators(df):
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
 
-    # 2. EMA (50)
     df['EMA'] = df['close'].ewm(span=50, adjust=False).mean()
 
-    # 3. VWAP
     typical_price = (df['high'] + df['low'] + df['close']) / 3
     df['VWAP'] = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
 
-    # 4. ADX (14)
     tr1 = df['high'] - df['low']
     tr2 = (df['high'] - df['close'].shift(1)).abs()
     tr3 = (df['low'] - df['close'].shift(1)).abs()
@@ -121,18 +118,26 @@ async def fetch_and_analyze(session, coin):
                 print(f"[{coin}] Binance API Error Status: {response.status}")
     except Exception as e:
         print(f"[{coin}] Internal Code Error: {e}")
-        traceback.print_exc()
     return None
 
 async def background_scanner():
     global live_market_data
     while True:
+        temp_data = []
         async with aiohttp.ClientSession() as session:
-            tasks = [fetch_and_analyze(session, coin) for coin in COINS]
-            results = await asyncio.gather(*tasks)
-            live_market_data = [res for res in results if res is not None]
+            # Har coin ko ek-ek karke fetch karenge, taaki ban na lage
+            for coin in COINS:
+                res = await fetch_and_analyze(session, coin)
+                if res:
+                    temp_data.append(res)
+                # Binance filter se bachne ke liye har coin ke beech 1 second ka delay
+                await asyncio.sleep(1)
+                
+        # Jab saara data aa jaye, tabhi live list update karein
+        if temp_data:
+            live_market_data = temp_data
             
-        print("Swarali Strategy Scan Complete. Next scan in 10 seconds...")
+        print("Swarali Strategy Scan Complete. Next scan in 30 seconds...")
         await asyncio.sleep(REFRESH_INTERVAL_SEC)
 
 @app.on_event("startup")
