@@ -3,86 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swarali RSI 4 Lines | Live Dashboard</title>
+    <title>Swarali 4-Lines Dashboard</title>
     <style>
-        body { background-color: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #ffffff; border-bottom: 1px solid #2a2e39; padding-bottom: 10px; }
-        table { width: 100%; max-width: 1000px; margin: 20px auto; border-collapse: collapse; background-color: #1e222d; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #2a2e39; }
-        th { background-color: #2a2e39; color: #787b86; font-size: 12px; font-weight: 600; }
-        td { font-size: 14px; font-weight: 500; }
-        .sym { font-weight: bold; color: #ffffff; text-align: left; }
-        .green { color: #089981; } .red { color: #f23645; } .yellow { color: #ff9800; } .white { color: #ffffff; }
-        .bg-green { background-color: rgba(8, 153, 129, 0.2); color: #089981; padding: 4px 8px; border-radius: 4px; }
-        .bg-red { background-color: rgba(242, 54, 69, 0.2); color: #f23645; padding: 4px 8px; border-radius: 4px; }
-        .loader { text-align: center; margin-top: 50px; font-size: 18px; color: #787b86; }
+        body { 
+            background-color: #121212; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { color: #00e676; margin-bottom: 5px; }
+        p { color: #aaaaaa; font-size: 14px; margin-bottom: 20px; }
+        table { 
+            width: 95%; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            border-collapse: collapse; 
+            background-color: #1e1e1e;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td { 
+            padding: 15px; 
+            border-bottom: 1px solid #333; 
+        }
+        th { 
+            background-color: #2c2c2c; 
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        tr:hover { background-color: #2a2a2a; }
+        .buy { color: #00e676; font-weight: bold; font-size: 16px; }
+        .sell { color: #ff3d00; font-weight: bold; font-size: 16px; }
+        .wait { color: #777777; }
+        .coin-name { font-weight: bold; color: #ffeb3b; }
     </style>
 </head>
 <body>
 
-    <h1>Swarali Signal Verifier [LIVE]</h1>
-    <div id="loader" class="loader">Fetching Live Market Data from Python Engine...</div>
-    <table id="dashTable" style="display:none;">
+    <h1>Swarali Live Scanner</h1>
+    <p>Auto-refreshing every 30 seconds...</p>
+
+    <table>
         <thead>
             <tr>
-                <th>SYM</th> <th>PRICE</th> <th>ADX</th> <th>VWP%</th> <th>EMA%</th>
-                <th>RSI</th> <th>VOL</th> <th>DEL</th> <th>CVD</th> <th>OIM</th> <th>RNK</th>
+                <th>COIN</th>
+                <th>PRICE</th>
+                <th>RSI (14)</th>
+                <th>SIGNAL</th>
             </tr>
         </thead>
-        <tbody id="tableBody"></tbody>
+        <tbody id="data-table">
+            <tr><td colspan="4">Fetching live market data... Please wait</td></tr>
+        </tbody>
     </table>
 
     <script>
-        function formatVol(v) {
-            if(Math.abs(v) >= 1e6) return (v/1e6).toFixed(2) + 'M';
-            if(Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
-            return v.toFixed(1);
-        }
+        // Relative API URL - backend se seedha connect hoga
+        const API_URL = '/api/signals';
 
-        async function updateDashboard() {
+        async function fetchMarketData() {
             try {
-                const response = await fetch('/api/data');
+                const response = await fetch(API_URL);
                 const result = await response.json();
                 
-                if(result.data && result.data.length > 0) {
-                    document.getElementById('loader').style.display = 'none';
-                    document.getElementById('dashTable').style.display = 'table';
+                let rows = '';
+                result.data.forEach(item => {
+                    let signalClass = 'wait';
+                    if (item.signal === 'ss.b') signalClass = 'buy';
+                    if (item.signal === 'ss.s') signalClass = 'sell';
                     
-                    let html = '';
-                    result.data.forEach(row => {
-                        const vwpColor = row.vwp > 0 ? 'green' : 'red';
-                        const emaColor = row.ema > 0 ? 'green' : 'red';
-                        const cvdColor = row.cvd === 'BULL' ? 'green' : (row.cvd === 'BEAR' ? 'red' : 'white');
-                        const oimColor = row.oim === 'LB' ? 'green' : (row.oim === 'SB' ? 'red' : 'yellow');
-                        
-                        let rnkClass = 'white';
-                        if(row.rnk === 'SS.B') rnkClass = 'bg-green';
-                        else if(row.rnk === 'SS.S') rnkClass = 'bg-red';
-                        else if(row.rnk === 'S.B') rnkClass = 'green';
-                        else if(row.rnk === 'S.S') rnkClass = 'red';
-
-                        html += `<tr>
-                            <td class="sym">${row.sym}</td>
-                            <td>${row.price.toFixed(4)}</td>
-                            <td>${row.adx}</td>
-                            <td class="${vwpColor}">${row.vwp > 0 ? '+' : ''}${row.vwp}%</td>
-                            <td class="${emaColor}">${row.ema > 0 ? '+' : ''}${row.ema}%</td>
-                            <td>${row.rsi_st}</td>
-                            <td>${row.vol_st}</td>
-                            <td>${row.del > 0 ? '+' : ''}${formatVol(row.del)}</td>
-                            <td class="${cvdColor}">${row.cvd}</td>
-                            <td class="${oimColor}">${row.oim}</td>
-                            <td><span class="${rnkClass}">${row.rnk}</span></td>
-                        </tr>`;
-                    });
-                    document.getElementById('tableBody').innerHTML = html;
-                }
-            } catch (error) { console.error("Error fetching data:", error); }
+                    rows += `<tr>
+                        <td class="coin-name">${item.coin}</td>
+                        <td>${item.price}</td>
+                        <td>${item.rsi}</td>
+                        <td class="${signalClass}">${item.signal}</td>
+                    </tr>`;
+                });
+                
+                document.getElementById('data-table').innerHTML = rows;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('data-table').innerHTML = `<tr><td colspan="4" style="color:red;">Error loading data. Server sleeping or URL incorrect.</td></tr>`;
+            }
         }
 
-        // Auto Refresh every 5 seconds
-        setInterval(updateDashboard, 5000);
-        updateDashboard();
+        // Pehli baar turant load karein
+        fetchMarketData();
+        // Har 30 second me refresh karein (30000 ms)
+        setInterval(fetchMarketData, 30000);
     </script>
+
 </body>
 </html>
