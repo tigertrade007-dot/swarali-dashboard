@@ -3,16 +3,16 @@ import requests
 import asyncio
 import aiohttp
 import pandas as pd
-import pandas_ta as ta
+import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# 1. Telegram Settings (Render Environment se aayega)
+# 1. Telegram Settings 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# 2. Total 40 Coins (Aapki final list + 3 Naye)
+# 2. Total 40 Coins List
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", 
     "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", 
@@ -25,7 +25,7 @@ COINS = [
 ]
 
 TIMEFRAME = '5m'
-REFRESH_INTERVAL_SEC = 30  # Har 30 second me data refresh hoga
+REFRESH_INTERVAL_SEC = 30  
 
 app = FastAPI()
 app.add_middleware(
@@ -36,11 +36,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Live data store karne ke liye list
 live_market_data = []
 
 def send_telegram_alert(coin, signal, rsi_val):
-    """Telegram par Swarali 4-Lines ka signal bhejne ka function"""
     if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         message = (
             f"🚨 *Swarali 4-Lines Alert* 🚨\n\n"
@@ -55,8 +53,44 @@ def send_telegram_alert(coin, signal, rsi_val):
         except Exception:
             pass
 
+def calculate_indicators(df):
+    """Bina kisi external library ke pure Math se Indicators nikalna"""
+    # 1. RSI (14)
+    delta = df['close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
+    rs = avg_gain / avg_loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    # 2. EMA (50)
+    df['EMA'] = df['close'].ewm(span=50, adjust=False).mean()
+
+    # 3. VWAP
+    typical_price = (df['high'] + df['low'] + df['close']) / 3
+    df['VWAP'] = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+
+    # 4. ADX (14)
+    tr1 = df['high'] - df['low']
+    tr2 = (df['high'] - df['close'].shift(1)).abs()
+    tr3 = (df['low'] - df['close'].shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    
+    up = df['high'] - df['high'].shift(1)
+    down = df['low'].shift(1) - df['low']
+    plus_dm = np.where((up > down) & (up > 0), up, 0.0)
+    minus_dm = np.where((down > up) & (down > 0), down, 0.0)
+    
+    atr = tr.ewm(alpha=1/14, adjust=False).mean()
+    plus_di = 100 * (pd.Series(plus_dm, index=df.index).ewm(alpha=1/14, adjust=False).mean() / atr)
+    minus_di = 100 * (pd.Series(minus_dm, index=df.index).ewm(alpha=1/14, adjust=False).mean() / atr)
+    dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
+    df['ADX'] = dx.ewm(alpha=1/14, adjust=False).mean()
+
+    return df
+
 async def fetch_and_analyze(session, coin):
-    # Limit 100 rakhi hai taaki EMA aur ADX sahi se calculate ho sakein
     url = f"https://fapi.binance.com/fapi/v1/klines?symbol={coin}&interval={TIMEFRAME}&limit=100"
     try:
         async with session.get(url, timeout=15) as response:
@@ -65,22 +99,9 @@ async def fetch_and_analyze(session, coin):
                 df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
                 df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
                 
-                # --- SWARALI 4-LINES STRATEGY ENGINE ---
-                # 1. RSI (14)
-                df['RSI'] = ta.rsi(df['close'], length=14)
+                # Naya mathematical engine run karein
+                df = calculate_indicators(df)
                 
-                # 2. EMA (Trend filter - 50 period)
-                df['EMA'] = ta.ema(df['close'], length=50)
-                
-                # 3. ADX (Momentum Filter - 14 period)
-                adx_data = ta.adx(df['high'], df['low'], df['close'], length=14)
-                df['ADX'] = adx_data['ADX_14'] if adx_data is not None else 0
-                
-                # 4. VWAP (Volume Filter)
-                typical_price = (df['high'] + df['low'] + df['close']) / 3
-                df['VWAP'] = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
-                
-                # Current values check karna
                 current_price = df['close'].iloc[-1]
                 current_rsi = round(df['RSI'].iloc[-1], 2)
                 current_ema = df['EMA'].iloc[-1]
@@ -89,12 +110,12 @@ async def fetch_and_analyze(session, coin):
                 
                 signal = "Wait"
                 
-                # BUY LOGIC (ss.b): RSI Oversold se ghoome, Price EMA & VWAP ke upar ho, aur ADX trend support kare
+                # BUY LOGIC (ss.b)
                 if current_rsi < 35 and current_price > current_ema and current_price > current_vwap and current_adx > 20:
                     signal = "ss.b"
                     send_telegram_alert(coin, signal, current_rsi)
                     
-                # SELL LOGIC (ss.s): RSI Overbought se gire, Price EMA & VWAP ke niche ho, aur ADX trend support kare
+                # SELL LOGIC (ss.s)
                 elif current_rsi > 65 and current_price < current_ema and current_price < current_vwap and current_adx > 20:
                     signal = "ss.s"
                     send_telegram_alert(coin, signal, current_rsi)
@@ -106,7 +127,6 @@ async def fetch_and_analyze(session, coin):
                     "signal": signal
                 }
     except Exception:
-        # Agar Binance ne USDT.D jaisa invalid coin reject kiya, toh hum usko ignore kar denge
         pass
     return None
 
@@ -116,8 +136,6 @@ async def background_scanner():
         async with aiohttp.ClientSession() as session:
             tasks = [fetch_and_analyze(session, coin) for coin in COINS]
             results = await asyncio.gather(*tasks)
-            
-            # Khali/Rejected data hata kar list update karein
             live_market_data = [res for res in results if res is not None]
             
         print("Swarali Strategy Scan Complete. Next scan in 30 seconds...")
@@ -125,15 +143,12 @@ async def background_scanner():
 
 @app.on_event("startup")
 async def startup_event():
-    # Server start hote hi scanner background me chalu ho jayega
     asyncio.create_task(background_scanner())
 
 @app.get("/api/signals")
 async def get_signals():
-    # Website ko data dene ke liye API endpoint
     return {"data": live_market_data}
 
 if __name__ == "__main__":
-    # Render cloud ke hisaab se port setting
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
