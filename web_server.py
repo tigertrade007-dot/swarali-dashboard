@@ -10,6 +10,9 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 from datetime import datetime
 
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
 COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", 
     "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "TRXUSDT", 
@@ -21,6 +24,20 @@ REFRESH_INTERVAL_SEC = 10
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+def send_telegram_alert(message):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print("Telegram Error:", e)
 
 def calculate_indicators(df):
     delta = df['close'].diff()
@@ -129,6 +146,11 @@ async def fetch_and_analyze(session, coin, timeframe, use_cvd, use_vwap, use_oim
                         rk_str = "B"
                     elif vol_breakout:
                         rk_str = "S"
+
+                    # Telegram Notification Trigger for SS Signals
+                    if rk_str in ["SS.B", "SS.S"]:
+                        msg = f"🚨 *Swarali RSI Signal* 🚨\n\nSymbol: `{coin}`\nRank: `{rk_str}`\nRSI: `{rsi:.1f}`\nTime: `{datetime.now().strftime('%H:%M:%S')}`"
+                        send_telegram_alert(msg)
 
                     star = ""
                     if show_star and rk_str in ["SS.B", "S.B"] and c > ema200:
