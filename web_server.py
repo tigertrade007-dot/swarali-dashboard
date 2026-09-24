@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
@@ -47,7 +47,8 @@ async def test_telegram():
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return {"status": "Error: Telegram Token or Chat ID is missing in environment variables!"}
     
-    msg = "🚨 *Swarali Dashboard Test Signal* 🚨\n\nStatus: Bot is working perfectly! 🚀\nTime: " + datetime.now().strftime('%H:%M:%S')
+    ist_time = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M:%S')
+    msg = f"🚨 *Swarali Dashboard Test Signal* 🚨\n\nStatus: Bot is working perfectly! 🚀\nTime (IST): `{ist_time}`"
     send_telegram_alert(msg)
     return {"status": "Test message sent successfully to Telegram!"}
 
@@ -161,11 +162,16 @@ async def fetch_and_analyze(session, coin, timeframe, use_cvd, use_vwap, use_oim
                     elif vol_breakout:
                         rk_str = "S"
 
-                    # Anti-Spam Check: Ek candle ke liye sirf ek baar alert jayega
+                    # Telegram Alert with IST Time and Timeframe mapping
                     if rk_str in ["SS.B", "SS.S"]:
-                        signal_key = f"{coin}_{rk_str}_{latest_candle_time}"
+                        signal_key = f"{coin}_{timeframe}_{rk_str}_{latest_candle_time}"
                         if signal_key not in sent_signals_cache:
-                            msg = f"🚨 *Swarali RSI Signal* 🚨\n\nSymbol: `{coin}`\nRank: `{rk_str}`\nRSI: `{rsi:.1f}`\nTime: `{datetime.now().strftime('%H:%M:%S')}`"
+                            tf_map = {"5": "5 Min", "15": "15 Min", "60": "1 Hour", "240": "4 Hour", "D": "1 Day"}
+                            tf_name = tf_map.get(timeframe, timeframe)
+                            
+                            ist_time = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%H:%M:%S')
+                            
+                            msg = f"🚨 *Swarali RSI Signal* 🚨\n\nSymbol: `{coin}`\nTimeframe: `{tf_name}`\nRank: `{rk_str}`\nRSI: `{rsi:.1f}`\nTime (IST): `{ist_time}`"
                             send_telegram_alert(msg)
                             sent_signals_cache[signal_key] = True
 
@@ -205,7 +211,7 @@ async def fetch_and_analyze(session, coin, timeframe, use_cvd, use_vwap, use_oim
                         "rnk": rk_str,
                         "ai_verdict": ai_verdict,
                         "v_5min": v_5min,
-                        "prc_time": f"{c} @{datetime.now().strftime('%H:%M')}" if rk_str != "-" else "-",
+                        "prc_time": f"{c} @{datetime.now(timezone(timedelta(hours=5, minutes=30))) .strftime('%H:%M')}" if rk_str != "-" else "-",
                         "tdy": "🟢0 🔴0",
                         "yst": "🟢0 🔴0"
                     }
