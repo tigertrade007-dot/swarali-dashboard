@@ -8,86 +8,109 @@
         body { background-color: #12161C; color: #D1D4DC; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; text-align: center; }
         h2 { color: #089981; margin-bottom: 5px; }
         
-        /* Settings Panel Styling */
-        .settings-container { background-color: #1E222D; border: 1px solid #363A45; border-radius: 8px; max-width: 900px; margin: 0 auto 20px auto; padding: 15px; text-align: left; }
-        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
+        .settings-container { background-color: #1E222D; border: 1px solid #363A45; border-radius: 8px; max-width: 1300px; margin: 0 auto 20px auto; padding: 15px; text-align: left; }
+        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
         .setting-item { background: #2A2E39; padding: 8px 12px; border-radius: 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         .setting-item label { color: #B2B5BE; cursor: pointer; }
         .setting-item input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+        .setting-item select { background: #12161C; color: #fff; border: 1px solid #434651; padding: 4px 8px; border-radius: 3px; font-size: 12px; }
         
         .toggle-btn { background-color: #2962FF; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
         .toggle-btn:hover { background-color: #1e4bd8; }
         
         #settings-body { display: none; }
 
-        /* Dashboard Table Styling */
-        table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background-color: #1E222D; font-size: 13px; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        table { width: 100%; max-width: 1300px; margin: 0 auto; border-collapse: collapse; background-color: #1E222D; font-size: 13px; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         th, td { padding: 10px 8px; border-bottom: 1px solid #363A45; }
         th { background-color: #2A2E39; font-weight: bold; color: #D1D4DC; }
         tr:hover { background-color: #252833; }
         
-        .bg-green { background-color: rgba(8, 153, 129, 0.4); color: #00FF00; font-weight: bold; }
-        .bg-red { background-color: rgba(242, 54, 69, 0.4); color: #FF5252; font-weight: bold; }
-        .bg-dark { background-color: #1E222D; color: #D1D4DC; }
+        .bg-green { color: #00FF00; font-weight: bold; }
+        .bg-red { color: #FF5252; font-weight: bold; }
+        .bg-rank-green { background-color: rgba(8, 153, 129, 0.4); color: #00FF00; font-weight: bold; }
+        .bg-rank-red { background-color: rgba(242, 54, 69, 0.4); color: #FF5252; font-weight: bold; }
+        .badge-orange { background-color: #FF9800; color: #000; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
+        .badge-green { background-color: #089981; color: #fff; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
         .sym-col { font-weight: bold; text-align: left; color: #F0F3FA; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
     <h2>Swarali RSI 4 Lines Dashboard [LIVE]</h2>
-    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">Rank & Scoring Conditions Control Panel</p>
+    <p style="color: #848E9C; font-size: 12px; margin-bottom: 15px;">Complete Bybit Scanner with Rankings, OI Trend, AI Verdict & Column Toggles</p>
 
-    <!-- Collapsible Settings Panel -->
-    <button class="toggle-btn" onclick="toggleSettings()">🏆 Toggle Rank & Scoring Conditions</button>
+    <button class="toggle-btn" onclick="toggleSettings()">⚙️ Toggle Settings & Column Toggles</button>
     
     <div class="settings-container" id="settings-body">
-        <h3 style="color: #089981; margin-top: 0; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Rank & Scoring Conditions</h3>
+        <h3 style="color: #2962FF; margin-top: 0; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">General Settings</h3>
         <div class="group-grid">
             <div class="setting-item">
-                <label for="chkCvd">Count CVD (Delta) Point</label>
-                <input type="checkbox" id="chkCvd" checked onchange="fetchMarketData()">
+                <label>Timeframe:</label>
+                <select id="selTimeframe" onchange="fetchMarketData()">
+                    <option value="5">5 Min</option>
+                    <option value="15">15 Min</option>
+                    <option value="60">1 Hour</option>
+                    <option value="240">4 Hour</option>
+                    <option value="D">1 Day</option>
+                </select>
             </div>
-            <div class="setting-item">
-                <label for="chkVwap">Count VWAP Point</label>
-                <input type="checkbox" id="chkVwap" checked onchange="fetchMarketData()">
-            </div>
-            <div class="setting-item">
-                <label for="chkOim">Count OIM Point</label>
-                <input type="checkbox" id="chkOim" checked onchange="fetchMarketData()">
-            </div>
-            <div class="setting-item">
-                <label for="chkAdx">Count ADX (>20) Point</label>
-                <input type="checkbox" id="chkAdx" checked onchange="fetchMarketData()">
-            </div>
-            <div class="setting-item">
-                <label for="chkReqVol">Require Daily Vol Break (SS)</label>
-                <input type="checkbox" id="chkReqVol" checked onchange="fetchMarketData()">
-            </div>
-            <div class="setting-item">
-                <label for="chkReqRsi">Require RSI Break (SS)</label>
-                <input type="checkbox" id="chkReqRsi" onchange="fetchMarketData()">
-            </div>
-            <div class="setting-item">
-                <label for="chkStar">Show High-Timeframe EMA Star (★)</label>
-                <input type="checkbox" id="chkStar" checked onchange="fetchMarketData()">
-            </div>
+        </div>
+
+        <h3 style="color: #089981; margin-top: 15px; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Rank & Scoring Conditions</h3>
+        <div class="group-grid">
+            <div class="setting-item"><label>Count CVD Point</label><input type="checkbox" id="chkCvd" checked onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Count VWAP Point</label><input type="checkbox" id="chkVwap" checked onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Count OIM Point</label><input type="checkbox" id="chkOim" checked onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Count ADX (>20) Point</label><input type="checkbox" id="chkAdx" checked onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Require Daily Vol Break (SS)</label><input type="checkbox" id="chkReqVol" checked onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Require RSI Break (SS)</label><input type="checkbox" id="chkReqRsi" onchange="fetchMarketData()"></div>
+            <div class="setting-item"><label>Show EMA Star (★)</label><input type="checkbox" id="chkStar" checked onchange="fetchMarketData()"></div>
+        </div>
+
+        <h3 style="color: #FF9800; margin-top: 15px; font-size: 15px; border-bottom: 1px solid #363A45; padding-bottom: 5px;">Dashboard Columns Show/Hide</h3>
+        <div class="group-grid">
+            <div class="setting-item"><label>Show Price</label><input type="checkbox" id="colPrice" checked onchange="toggleColumn(1, this.checked)"></div>
+            <div class="setting-item"><label>Show OI Trend</label><input type="checkbox" id="colOi" checked onchange="toggleColumn(2, this.checked)"></div>
+            <div class="setting-item"><label>Show RSI</label><input type="checkbox" id="colRsi" checked onchange="toggleColumn(3, this.checked)"></div>
+            <div class="setting-item"><label>Show ADX</label><input type="checkbox" id="colAdx" checked onchange="toggleColumn(4, this.checked)"></div>
+            <div class="setting-item"><label>Show VWP</label><input type="checkbox" id="colVwp" checked onchange="toggleColumn(5, this.checked)"></div>
+            <div class="setting-item"><label>Show EMA</label><input type="checkbox" id="colEma" checked onchange="toggleColumn(6, this.checked)"></div>
+            <div class="setting-item"><label>Show DEL</label><input type="checkbox" id="colDel" checked onchange="toggleColumn(7, this.checked)"></div>
+            <div class="setting-item"><label>Show CVD Div</label><input type="checkbox" id="colCvdDiv" checked onchange="toggleColumn(8, this.checked)"></div>
+            <div class="setting-item"><label>Show OIM</label><input type="checkbox" id="colOim" checked onchange="toggleColumn(9, this.checked)"></div>
+            <div class="setting-item"><label>Show RNK</label><input type="checkbox" id="colRnk" checked onchange="toggleColumn(10, this.checked)"></div>
+            <div class="setting-item"><label>Show AI Verdict</label><input type="checkbox" id="colAi" checked onchange="toggleColumn(11, this.checked)"></div>
+            <div class="setting-item"><label>Show 5m Verdict</label><input type="checkbox" id="col5m" checked onchange="toggleColumn(12, this.checked)"></div>
+            <div class="setting-item"><label>Show PRC@TIME</label><input type="checkbox" id="colPrc" checked onchange="toggleColumn(13, this.checked)"></div>
+            <div class="setting-item"><label>Show TDY</label><input type="checkbox" id="colTdy" checked onchange="toggleColumn(14, this.checked)"></div>
+            <div class="setting-item"><label>Show YST</label><input type="checkbox" id="colYst" checked onchange="toggleColumn(15, this.checked)"></div>
         </div>
     </div>
 
-    <!-- Live Scanner Table -->
     <table>
         <thead>
             <tr>
                 <th>SYM</th>
+                <th>PRICE</th>
+                <th>OI TREND</th>
                 <th>RSI</th>
                 <th>ADX</th>
-                <th>DEL (CVD)</th>
+                <th>VWP</th>
+                <th>EMA</th>
+                <th>DEL</th>
+                <th>CVD</th>
+                <th>OIM</th>
                 <th>RNK</th>
+                <th>AI VERDICT</th>
+                <th>5m VERDICT</th>
                 <th>PRC@TIME</th>
+                <th>TDY</th>
+                <th>YST</th>
             </tr>
         </thead>
         <tbody id="data-table">
-            <tr><td colspan="6">Fetching Market Data from Bybit...</td></tr>
+            <tr><td colspan="16">Fetching Market Data...</td></tr>
         </tbody>
     </table>
 
@@ -97,7 +120,22 @@
             x.style.display = (x.style.display === "block") ? "none" : "block";
         }
 
+        function toggleColumn(colIndex, show) {
+            var table = document.querySelector("table");
+            for (var i = 0; i < table.rows.length; i++) {
+                var cell = table.rows[i].cells[colIndex];
+                if (cell) {
+                    if (show) {
+                        cell.classList.remove("hidden");
+                    } else {
+                        cell.classList.add("hidden");
+                    }
+                }
+            }
+        }
+
         async function fetchMarketData() {
+            const timeframe = document.getElementById('selTimeframe').value;
             const useCvd = document.getElementById('chkCvd').checked;
             const useVwap = document.getElementById('chkVwap').checked;
             const useOim = document.getElementById('chkOim').checked;
@@ -107,6 +145,7 @@
             const showStar = document.getElementById('chkStar').checked;
 
             const queryParams = new URLSearchParams({
+                timeframe: timeframe,
                 use_cvd: useCvd,
                 use_vwap: useVwap,
                 use_oim: useOim,
@@ -123,25 +162,57 @@
                 
                 if (result.data && result.data.length > 0) {
                     result.data.forEach(item => {
+                        let priceClass = item.price.includes('UP') ? 'bg-green' : 'bg-red';
+                        let oiClass = item.oi_trend.includes('UP') ? 'bg-green' : 'bg-red';
                         let rnkClass = 'bg-dark';
-                        if (item.rnk.includes('B')) rnkClass = 'bg-green';
-                        else if (item.rnk.includes('S')) rnkClass = 'bg-red';
+                        if (item.rnk.includes('B')) rnkClass = 'bg-rank-green';
+                        else if (item.rnk.includes('S')) rnkClass = 'bg-rank-red';
                         
-                        let cvdClass = item.cvd.includes('-') ? 'bg-red' : 'bg-green';
+                        let delClass = item.del.includes('-') ? 'bg-red' : 'bg-green';
                         let rsiClass = item.rsi > 60 ? 'bg-red' : (item.rsi < 40 ? 'bg-green' : 'bg-dark');
+                        let aiBadge = item.ai_verdict.includes('REAL') ? 'badge-green' : 'badge-orange';
+                        let v5Badge = item.v_5min.includes('REAL') ? 'badge-green' : 'badge-orange';
 
                         rows += `<tr>
                             <td class="sym-col">${item.sym}</td>
+                            <td class="${priceClass}">${item.price}</td>
+                            <td class="${oiClass}">${item.oi_trend}</td>
                             <td class="${rsiClass}">${item.rsi}</td>
                             <td>${item.adx}</td>
-                            <td class="${cvdClass}">${item.cvd}</td>
+                            <td>${item.vwp}</td>
+                            <td>${item.ema}</td>
+                            <td class="${delClass}">${item.del}</td>
+                            <td>${item.cvd_div}</td>
+                            <td>${item.oim}</td>
                             <td class="${rnkClass}">${item.rnk}</td>
+                            <td><span class="${aiBadge}">${item.ai_verdict}</span></td>
+                            <td><span class="${v5Badge}">${item.v_5min}</span></td>
                             <td>${item.prc_time}</td>
+                            <td>${item.tdy}</td>
+                            <td>${item.yst}</td>
                         </tr>`;
                     });
                     document.getElementById('data-table').innerHTML = rows;
+
+                    // Re-apply column toggles
+                    toggleColumn(1, document.getElementById('colPrice').checked);
+                    toggleColumn(2, document.getElementById('colOi').checked);
+                    toggleColumn(3, document.getElementById('colRsi').checked);
+                    toggleColumn(4, document.getElementById('colAdx').checked);
+                    toggleColumn(5, document.getElementById('colVwp').checked);
+                    toggleColumn(6, document.getElementById('colEma').checked);
+                    toggleColumn(7, document.getElementById('colDel').checked);
+                    toggleColumn(8, document.getElementById('colCvdDiv').checked);
+                    toggleColumn(9, document.getElementById('colOim').checked);
+                    toggleColumn(10, document.getElementById('colRnk').checked);
+                    toggleColumn(11, document.getElementById('colAi').checked);
+                    toggleColumn(12, document.getElementById('col5m').checked);
+                    toggleColumn(13, document.getElementById('colPrc').checked);
+                    toggleColumn(14, document.getElementById('colTdy').checked);
+                    toggleColumn(15, document.getElementById('colYst').checked);
+
                 } else {
-                    document.getElementById('data-table').innerHTML = `<tr><td colspan="6">Scanning coins... Please wait.</td></tr>`;
+                    document.getElementById('data-table').innerHTML = `<tr><td colspan="16">Scanning market data...</td></tr>`;
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
