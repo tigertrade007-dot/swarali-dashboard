@@ -22,7 +22,7 @@ COINS = [
 
 REFRESH_INTERVAL_SEC = 10  
 
-# Spam rokne ke liye tracking memory
+# Spam rokne ke liye tracking memory dictionary
 sent_signals_cache = {}
 
 app = FastAPI()
@@ -98,7 +98,6 @@ async def fetch_and_analyze(session, coin, timeframe, use_cvd, use_vwap, use_oim
                     adx = df['ADX'].iloc[-1]
                     cvd = df['CVD'].iloc[-1]
                     
-                    # Latest candle timestamp taaki unique identify ho sake
                     latest_candle_time = df['timestamp'].iloc[-1]
 
                     oim = "LB" if (c > o and cvd > 0) else ("SB" if (c < o and cvd < 0) else "-")
@@ -153,13 +152,12 @@ async def fetch_and_analyze(session, coin, timeframe, use_cvd, use_vwap, use_oim
                     elif vol_breakout:
                         rk_str = "S"
 
-                    # Anti-Spam Check: Har naye candle/signal ke liye sirf ek baar alert jayega
+                    # Anti-Spam Check: Ek candle ke liye sirf ek baar alert jayega
                     if rk_str in ["SS.B", "SS.S"]:
                         signal_key = f"{coin}_{rk_str}_{latest_candle_time}"
                         if signal_key not in sent_signals_cache:
                             msg = f"🚨 *Swarali RSI Signal* 🚨\n\nSymbol: `{coin}`\nRank: `{rk_str}`\nRSI: `{rsi:.1f}`\nTime: `{datetime.now().strftime('%H:%M:%S')}`"
                             send_telegram_alert(msg)
-                            # Cache mein save kar lo taaki dubara na jaye
                             sent_signals_cache[signal_key] = True
 
                     star = ""
@@ -237,5 +235,5 @@ async def serve_home():
         return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
-    port = int(os.environ.0.get("PORT", 8000)) if False else int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
