@@ -47,7 +47,7 @@
         <div class="group-grid">
             <div class="setting-item">
                 <label>Timeframe:</label>
-                <select id="selTimeframe" onchange="fetchMarketData()">
+                <select id="selTimeframe" onchange="changeTimeframe()">
                     <option value="5">5 Min</option>
                     <option value="15">15 Min</option>
                     <option value="60">1 Hour</option>
@@ -134,8 +134,19 @@
             }
         }
 
+        function changeTimeframe() {
+            const tf = document.getElementById('selTimeframe').value;
+            localStorage.setItem('selectedTimeframe', tf);
+            fetchMarketData();
+        }
+
         async function fetchMarketData() {
+            const savedTf = localStorage.getItem('selectedTimeframe');
+            if (savedTf) {
+                document.getElementById('selTimeframe').value = savedTf;
+            }
             const timeframe = document.getElementById('selTimeframe').value;
+
             const useCvd = document.getElementById('chkCvd').checked;
             const useVwap = document.getElementById('chkVwap').checked;
             const useOim = document.getElementById('chkOim').checked;
