@@ -42,6 +42,15 @@ def send_telegram_alert(message):
     except Exception as e:
         print("Telegram Error:", e)
 
+@app.get("/api/test-telegram")
+async def test_telegram():
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return {"status": "Error: Telegram Token or Chat ID is missing in environment variables!"}
+    
+    msg = "🚨 *Swarali Dashboard Test Signal* 🚨\n\nStatus: Bot is working perfectly! 🚀\nTime: " + datetime.now().strftime('%H:%M:%S')
+    send_telegram_alert(msg)
+    return {"status": "Test message sent successfully to Telegram!"}
+
 def calculate_indicators(df):
     delta = df['close'].diff()
     gain = delta.where(delta > 0, 0.0)
